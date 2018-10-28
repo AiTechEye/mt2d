@@ -173,10 +173,10 @@ minetest.register_entity("mt2d:cam",{
 			v.x=-4
 			mt2d.player_anim(self,"walk")
 			self.ob:set_yaw(1.57)
-		elseif key.jump then
-			self.user:set_detach()
-			mt2d.user[self.username].id=math.random(1,9999)
-			return
+		--elseif key.jump then
+		--	self.user:set_detach()
+		--	mt2d.user[self.username].id=math.random(1,9999)
+		--	return
 		else
 			mt2d.player_anim(self,"stand")
 			v={x=0,y=v.y,z=0}
