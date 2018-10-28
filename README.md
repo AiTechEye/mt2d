@@ -1,4 +1,4 @@
-# mt2d = minetest 2d
+# mt2d - minetest 2d
 
 # code/media License: CC0
 
