@@ -65,34 +65,9 @@ minetest.register_entity("mt2d:cam",{
 	textures ={"mt2d_air.png"},
 	on_activate=function(self, staticdata)
 		self.dmgtimer=0
-		if 1 then return end
-		if staticdata~="" then
-			self.username=staticdata
-		elseif aliveai_mindcontroller.usersname then
-			self.username=aliveai_mindcontroller.usersname
-			aliveai_mindcontroller.usersname=nil
-		end
-		local e=aliveai_mindcontroller.users[self.username]
-		if not (self.username and e ) then
-			self.object:remove()
-			return self
-		end
-		if minetest.check_player_privs(self.username, {fly=true})==false then
-			self.object:set_acceleration({x=0,y=-10,z =0})
-			self.object:set_velocity({x=0,y=-3,z =0})
-		end
-
-		self.object:set_animation({ x=1, y=39, },30,0)
-		self.object:set_properties({
-			mesh=aliveai.character_model,
-			textures=e.texture,
-			nametag=self.username,
-			nametag_color="#FFFFFF"
-		})
+		self.breath=11
+		self.user_pos={x=0,y=0,z=0}
 		return self
-	end,
-	get_staticdata = function(self)
-		return self.username
 	end,
 	on_step=function(self, dtime)
 		if self.start>0 then
@@ -112,7 +87,21 @@ minetest.register_entity("mt2d:cam",{
 			self.ob:get_luaentity().id=self.id
 			self.ob:get_luaentity().username=self.username
 
-			self.user_pos={x=0,y=0,z=0}
+			
+			--if minetest.check_player_privs(self.username, {fly=true})==false then
+			--end
+
+			self.ob:set_properties({
+				textures="mt2d_air.png",
+				nametag=self.username,
+				nametag_color="#FFFFFF"
+			})
+
+			self.user:set_properties({
+				textures="mt2d_air.png",
+				nametag="",
+			})
+
 			mt2d.user[self.username].object=self.ob
 		end
 
@@ -121,9 +110,12 @@ minetest.register_entity("mt2d:cam",{
 		local key=self.user:get_player_control()
 
 		local v=self.ob:get_velocity()
-		local node=minetest.registered_nodes[minetest.get_node(pos2).name] 
+		local node=minetest.registered_nodes[minetest.get_node({x=pos2.x,y=pos2.y-1,z=0}).name]
+		local node2=minetest.registered_nodes[minetest.get_node({x=pos2.x,y=pos2.y+1,z=0}).name]
 
-		if node and node.damage_per_second>0 then
+		if not (node and node2) then return end
+
+		if node.damage_per_second>0 then
 			self.dmgtimer=self.dmgtimer+dtime
 			if self.dmgtimer>1 then
 				self.dmgtimer=0
@@ -131,18 +123,34 @@ minetest.register_entity("mt2d:cam",{
 			end
 		end
 
-		if node and node.liquid_viscosity>0 then
+		if node2.drowning>0 then
+			self.breath=self.breath-dtime
+			self.user:set_breath(self.breath)
+			if self.breath<=0 then
+				self.breath=0
+				self.dmgtimer=self.dmgtimer+dtime
+				if self.dmgtimer>1 then
+					self.dmgtimer=0
+					mt2d.punch(self.user,self.ob,1)
+				end
+			end
+		elseif self.breath<11 then
+			self.breath=self.breath+dtime
+			self.user:set_breath(self.breath)
+		end
+
+		if node.liquid_viscosity>0 or node.climbable then
 			if v.y<-0.1 then
-				v={x = v.x*0.9, y =v.y*0.9, z =v.z*0.9}
+				v={x = v.x*0.99, y =v.y*0.99, z =v.z*0.99}
 			end
-			if not self.in_liquid then
+			if not self.floating then
 				self.fallingfrom=nil
-				self.ob:set_acceleration({x=0,y=0,z =0})
-				self.in_liquid=true
+				self.ob:set_acceleration({x=0,y=0,z=0})
+				self.floating=true
 			end
-		elseif self.in_liquid then
+		elseif self.floating then
 			self.ob:set_acceleration({x=0,y=-20,z =0})
-			self.in_liquid=nil
+			self.floating=nil
 		elseif v.y<0 and not self.fallingfrom then
 			self.fallingfrom=pos.y
 		elseif self.fallingfrom and v.y==0 then
@@ -159,7 +167,7 @@ minetest.register_entity("mt2d:cam",{
 
 		if self.ob:get_luaentity().dead then
 			return self
-		elseif key.up and  (v.y==0 or self.in_liquid) then
+		elseif key.up and  (v.y==0 or self.floating) then
 			v.y=8
 		elseif key.RMB or key.LMB then
 			mt2d.player_anim(self,"mine")
@@ -182,7 +190,7 @@ minetest.register_entity("mt2d:cam",{
 			v={x=0,y=v.y,z=0}
 		end
 
-		if self.in_liquid then
+		if self.floating then
 			v.x=v.x/2
 			v.y=v.y/2
 			if key.down then
