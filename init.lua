@@ -10,10 +10,32 @@ mt2d={
 	},
 }
 
+minetest.register_privilege("leave2d", {
+	description = "Leave Dimension",
+	give_to_singleplayer= false,
+})
+
 minetest.after(0.1, function()
 	for i, v in pairs(minetest.registered_items) do
 		if not v.ragne or v.ragne<6 then
 			minetest.override_item(i, {range=6})
+		end
+	end
+	for i, v in pairs(minetest.registered_nodes) do
+		if v.drawtype~="airlike" and not v.mt2d then
+			minetest.override_item(i, {
+				paramtype="light",
+				paramtype2="none",
+				drawtype="nodebox",
+				node_box = {
+					type = "fixed",
+					fixed = {{-0.5, -0.5, 0, 0.5, 0.5, 0}},
+				},
+				--selection_box = {
+				--	type = "fixed",
+				--	fixed = {{-0.5, -0.5, 0, 0.5, 0.5, 0}},
+				--}
+			})
 		end
 	end
 end)
@@ -34,8 +56,10 @@ mt2d.new_player=function(player)
 	cam:get_luaentity().user=player
 	cam:get_luaentity().username=player:get_player_name()
 	cam:get_luaentity().id=id
-	mt2d.user[player:get_player_name()]={id=id,cam=cam}
+	mt2d.user[player:get_player_name()]={id=id,cam=cam,texture="character.png"}
 	player:set_attach(cam, "",{x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 0})
+	player:hud_set_flags({wielditem=false})
+	--print(dump(player:get_physics_override()))
 end
 
 minetest.register_on_joinplayer(function(player)
@@ -68,6 +92,7 @@ minetest.register_entity("mt2d:cam",{
 	visual =  "sprite",
 	textures ={"mt2d_air.png"},
 	on_activate=function(self, staticdata)
+		self.timer=0
 		self.dmgtimer=0
 		self.breath=11
 		self.user_pos={x=0,y=0,z=0}
@@ -87,12 +112,9 @@ minetest.register_entity("mt2d:cam",{
 			self.ob:get_luaentity().user=self.user
 			self.ob:get_luaentity().id=self.id
 			self.ob:get_luaentity().username=self.username
-			
-			--if minetest.check_player_privs(self.username, {fly=true})==false then
-			--end
 
 			self.ob:set_properties({
-				textures="mt2d_air.png",
+				textures={"mt2d_air.png",mt2d.user[self.username].texture},
 				nametag=self.username,
 				nametag_color="#FFFFFF"
 			})
@@ -166,13 +188,9 @@ minetest.register_entity("mt2d:cam",{
 
 		if self.ob:get_luaentity().dead then
 			return self
-		elseif key.up and  (v.y==0 or self.floating) then
+		elseif key.up and (v.y==0 or self.floating) then
 			v.y=8
-		elseif key.RMB or key.LMB then
-			mt2d.player_anim(self,"mine")
-		end
-
-		if key.left then
+		elseif key.left then
 			v.x=4
 			mt2d.player_anim(self,"walk")
 			self.ob:set_yaw(4.71)
@@ -180,10 +198,13 @@ minetest.register_entity("mt2d:cam",{
 			v.x=-4
 			mt2d.player_anim(self,"walk")
 			self.ob:set_yaw(1.57)
-		--elseif key.jump then
-		--	self.user:set_detach()
-		--	mt2d.user[self.username].id=math.random(1,9999)
-		--	return
+		elseif key.RMB or key.LMB then
+			mt2d.player_anim(self,"mine")
+		elseif key.aux1 and 	minetest.check_player_privs(self.username, {leave2d=true}) then
+			self.user:hud_set_flags({wielditem=true})
+			self.user:set_detach()
+			mt2d.user[self.username].id=math.random(1,9999)
+			return
 		else
 			mt2d.player_anim(self,"stand")
 			v={x=0,y=v.y,z=0}
@@ -214,11 +235,9 @@ minetest.register_entity("mt2d:cam",{
 		end
 		return self
 	end,
-	start=1,
+	start=0.1,
 	type="npc",
 })
-
-
 
 mt2d.pointable=function(p1,user)
 	local dir=user:get_look_dir()
@@ -248,6 +267,20 @@ mt2d.player_anim=function(self,typ)
 	end
 	self.anim=typ
 	self.ob:set_animation({x=mt2d.playeranim[typ].x, y=mt2d.playeranim[typ].y, },mt2d.playeranim[typ].speed,0)
+
+	if self.user and self.user:get_wielded_item()~=self.wielditem then
+		self.wielditem=self.user:get_wielded_item():get_name()
+		local t="mt2d_air.png"
+
+		local def1=minetest.registered_items[self.wielditem]
+
+		if def1 and def1.inventory_image and def1.inventory_image~="" then
+			t=def1.inventory_image
+		elseif def1 and def1.tiles and type(def1.tiles[1])=="string" then
+			t=def1.tiles[1]
+		end
+		self.ob:set_properties({textures={t,mt2d.user[self.username].texture}})
+	end
 	return self
 end
 
@@ -257,8 +290,7 @@ minetest.register_entity("mt2d:player",{
 	collisionbox = {-0.35,-1,-0.35,0.35,0.8,0.35},
 	visual =  "mesh",
 	mesh = "mt2d_character.b3d",
-	textures = {"character.png"},
-	spritediv = {x=1, y=1},
+	textures = {"mt2d_air.png","mt2d_air.png"},
 	is_visible = true,
 	makes_footstep_sound = true,
 	on_activate=function(self, staticdata)
@@ -276,6 +308,7 @@ minetest.register_entity("mt2d:player",{
 		return self
 	end,
 	on_step=function(self, dtime)
+		self.timer=self.timer+dtime
 		if self.start>0 then
 			self.start=self.start-dtime
 			return self
@@ -286,74 +319,27 @@ minetest.register_entity("mt2d:player",{
 			self.ob=self.object
 			self.ob:get_luaentity().dead=true
 			mt2d.player_anim(self,"lay")
+		elseif self.timer>3 then
+			self.timer=0
+			if not self.user:get_attach() then
+				mt2d.new_player(self.user)
+				return
+			end
 		end
 	end,
 	id=0,
 	username="",
-	start=1,
+	start=0.1,
 	type="npc",
 	team="Sam",
-	time=0,
+	timer=0,
 })
-
-minetest.register_node("mt2d:blocking", {
-	description = "blocking",
-	drawtype="airlike",
-	paramtype="light",
-	pointable=false,
-	on_blast = function(pos, intensity)
-		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
-	end,
-	after_destruct = function(pos, oldnode)
-		local m=minetest.get_meta(pos)
-		if m:get_int("reset")==0 then
-			minetest.after(1, function(pos)
-				minetest.set_node(pos,{name="mt2d:blocking"})
-				m:set_int("reset",1)
-				minetest.get_node_timer(pos):start(1)
-			end,pos)
-		end
-	end,
-	on_timer = function (pos, elapsed)
-		minetest.get_meta(pos):set_int("reset",0)
-	end,
-})
-
-local paths={
-{0.2,"bubble.png^[colorize:#0000ffff"},
-{0.2,"bubble.png^[colorize:#ffff00ff"},
-{0.3,"bubble.png^[colorize:#00ff00ff"}}
-
-for i=1,3,1 do
-minetest.register_entity("mt2d:path" .. i,{
-	hp_max = 1,
-	physical = false,
-	weight = 0,
-	collisionbox = {-0.1,-0.1,-0.1, 0.1,0.1,0.1},
-	visual = "sprite",
-	visual_size = {x=paths[i][1], y=paths[i][1]},
-	textures = {paths[i][2]}, 
-	colors = {}, 
-	spritediv = {x=1, y=1},
-	initial_sprite_basepos = {x=0, y=0},
-	is_visible = true,
-	makes_footstep_sound = false,
-	automatic_rotate = false,
-	is_falling=0,
-	on_step = function(self, dtime)
-		self.timer=self.timer-dtime
-		if self.timer<0 then
-			self.object:remove()
-		end
-	end,
-	timer=0.1,
-})
-end
-paths=nil
 
 minetest.register_on_generated(function(minp, maxp, seed)
 	local air=minetest.get_content_id("air")
 	local blocking=minetest.get_content_id("mt2d:blocking")
+	local sky=minetest.get_content_id("mt2d:blocking_sky")
+	local stone=minetest.get_content_id("mt2d:blocking_stone")
 	local vox = minetest.get_voxel_manip()
 	local min, max = vox:read_from_map(minp, maxp)
 	local area = VoxelArea:new({MinEdge = min, MaxEdge = max})
@@ -361,7 +347,11 @@ minetest.register_on_generated(function(minp, maxp, seed)
 	for z = minp.z, maxp.z do
 	for y = minp.y, maxp.y do
 	for x = minp.x, maxp.x do
-		if z==1 or z==-1 or z==5 then
+		if z==-1 and y>0 then
+			data[area:index(x,y,z)]=sky
+		elseif z==-1 and y<1 then
+			data[area:index(x,y,z)]=stone
+		elseif z==1 or z==5 then
 			data[area:index(x,y,z)]=blocking
 		elseif z~=0 then
 			data[area:index(x,y,z)]=air
@@ -413,6 +403,12 @@ minetest.spawn_item=function(pos, item)
 
 				e:set_pos({x=pos.x+(v.x/2),y=pos.y-0.5,z=0})
 				e:set_velocity({x=v.x,y=0,z=0})
+				e:set_properties({
+					visual="wielditem",
+					automatic_rotate=0,
+					--collisionbox={-0.5, -0.5, -0.2, 0.5, 0.5, 0.2},
+					textures=e:get_properties().textures
+				})
 			end
 		end,e)
 
@@ -427,3 +423,75 @@ minetest.spawn_item=function(pos, item)
 	end
 	return e
 end
+
+minetest.register_node("mt2d:blocking", {
+	description = "blocking",
+	drawtype="airlike",
+	paramtype="light",
+	pointable=false,
+	mt2d=true,
+	on_blast = function(pos, intensity)
+		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
+	end,
+	after_destruct = function(pos, oldnode)
+		local m=minetest.get_meta(pos)
+		if m:get_int("reset")==0 then
+			minetest.after(1, function(pos)
+				minetest.set_node(pos,{name="mt2d:blocking"})
+				m:set_int("reset",1)
+				minetest.get_node_timer(pos):start(1)
+			end,pos)
+		end
+	end,
+	on_timer = function (pos, elapsed)
+		minetest.get_meta(pos):set_int("reset",0)
+	end,
+})
+
+minetest.register_node("mt2d:blocking_stone", {
+	description = "blocking stone",
+	paramtype="light",
+	pointable=false,
+	mt2d=true,
+	tiles={"default_stone.png^[colorize:#00000055"},
+	on_blast = function(pos, intensity)
+		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
+	end,
+	after_destruct = function(pos, oldnode)
+		local m=minetest.get_meta(pos)
+		if m:get_int("reset")==0 then
+			minetest.after(1, function(pos)
+				minetest.set_node(pos,{name="mt2d:blocking"})
+				m:set_int("reset",1)
+				minetest.get_node_timer(pos):start(1)
+			end,pos)
+		end
+	end,
+	on_timer = function (pos, elapsed)
+		minetest.get_meta(pos):set_int("reset",0)
+	end,
+})
+
+minetest.register_node("mt2d:blocking_sky", {
+	description = "blocking sky",
+	paramtype="light",
+	pointable=false,
+	mt2d=true,
+	tiles={"default_cloud.png^[colorize:#9ee7ffff"},
+	on_blast = function(pos, intensity)
+		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
+	end,
+	after_destruct = function(pos, oldnode)
+		local m=minetest.get_meta(pos)
+		if m:get_int("reset")==0 then
+			minetest.after(1, function(pos)
+				minetest.set_node(pos,{name="mt2d:blocking"})
+				m:set_int("reset",1)
+				minetest.get_node_timer(pos):start(1)
+			end,pos)
+		end
+	end,
+	on_timer = function (pos, elapsed)
+		minetest.get_meta(pos):set_int("reset",0)
+	end,
+})
