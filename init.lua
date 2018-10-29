@@ -1,4 +1,6 @@
 mt2d={
+	timer=0,
+	user3d={},
 	user={},
 	playeranim={
 		stand={x=1,y=39,speed=30},
@@ -59,8 +61,39 @@ mt2d.new_player=function(player)
 	mt2d.user[player:get_player_name()]={id=id,cam=cam,texture="character.png"}
 	player:set_attach(cam, "",{x = 0, y = 0, z = 0}, {x = 0, y = 0, z = 0})
 	player:hud_set_flags({wielditem=false})
-	--print(dump(player:get_physics_override()))
+	player:set_nametag_attributes({color={a=0,r=255,g=255,b=255}})
+	player:set_properties({textures={"mt2d_air.png"}})
 end
+	
+mt2d.to_3dplayer=function(player)
+	local name=player:get_player_name()
+	if mt2d.user3d[name] then
+		return
+	end
+
+	player:set_nametag_attributes({color={a=255,r=255,g=255,b=255}})
+	player:set_properties({textures={mt2d.user[name].texture}})
+	player:hud_set_flags({wielditem=true})
+	player:set_detach()
+	mt2d.user[name]=nil
+	mt2d.user3d[name]={timeout=false,player=player}
+end
+
+minetest.register_globalstep(function(dtime)
+	mt2d.timer=mt2d.timer+dtime
+	if mt2d.timer<2 then return end
+	mt2d.timer=0
+	for name, u in pairs(mt2d.user3d) do
+		if u.player:get_player_control().aux1 then
+			mt2d.new_player(u.player)
+			mt2d.user3d[name].timeout=true
+
+			minetest.after(2, function(name)
+				mt2d.user3d[name]=nil
+			end,name)
+		end
+	end
+end)
 
 minetest.register_on_joinplayer(function(player)
 	local pos=player:get_pos()
@@ -84,6 +117,12 @@ end)
 
 minetest.register_on_dieplayer(function(player)
 	player:set_detach()
+end)
+
+minetest.register_on_leaveplayer(function(player)
+	player:set_detach()
+	mt2d.user[player:get_player_name()]=nil
+	mt2d.user3d[player:get_player_name()]=nil
 end)
 
 minetest.register_entity("mt2d:cam",{
@@ -201,9 +240,7 @@ minetest.register_entity("mt2d:cam",{
 		elseif key.RMB or key.LMB then
 			mt2d.player_anim(self,"mine")
 		elseif key.aux1 and 	minetest.check_player_privs(self.username, {leave2d=true}) then
-			self.user:hud_set_flags({wielditem=true})
-			self.user:set_detach()
-			mt2d.user[self.username].id=math.random(1,9999)
+			mt2d.to_3dplayer(self.user)
 			return
 		else
 			mt2d.player_anim(self,"stand")
