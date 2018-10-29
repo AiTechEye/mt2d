@@ -47,8 +47,12 @@ minetest.register_on_joinplayer(function(player)
 end)
 
 minetest.register_on_respawnplayer(function(player)
-	local pos=player:get_pos()
-	player:set_pos({x=pos.x,y=pos.y,z=0})
+
+	minetest.after(0, function(player)
+		local pos=player:get_pos()
+		player:set_pos({x=pos.x,y=pos.y,z=5})
+	end,player)
+
 	minetest.after(1, function(player)
 		mt2d.new_player(player)
 	end,player)
@@ -78,15 +82,11 @@ minetest.register_entity("mt2d:cam",{
 			return self
 		elseif not (self.ob and self.ob:get_luaentity()) then
 			local pos=self.object:get_pos()
-			local rndlook={4.71,1.57}
 			self.ob=minetest.add_entity({x=pos.x,y=pos.y+1,z=pos.z-5}, "mt2d:player")
-			self.ob:set_acceleration({x=0,y=-20,z =0})
-			self.ob:set_yaw(rndlook[math.random(1,2)])
-			self.ob:get_luaentity().user=self.user
 
+			self.ob:get_luaentity().user=self.user
 			self.ob:get_luaentity().id=self.id
 			self.ob:get_luaentity().username=self.username
-
 			
 			--if minetest.check_player_privs(self.username, {fly=true})==false then
 			--end
@@ -163,7 +163,6 @@ minetest.register_entity("mt2d:cam",{
 				mt2d.punch(self.ob,self.ob,d)
 			end
 		end
-
 
 		if self.ob:get_luaentity().dead then
 			return self
@@ -262,8 +261,16 @@ minetest.register_entity("mt2d:player",{
 	spritediv = {x=1, y=1},
 	is_visible = true,
 	makes_footstep_sound = true,
+	on_activate=function(self, staticdata)
+		local rndlook={4.71,1.57}
+		self.object:set_yaw(rndlook[math.random(1,2)])
+		self.object:set_acceleration({x=0,y=-20,z =0})
+		return self
+	end,
 	on_punch=function(self, puncher, time_from_last_punch, tool_capabilities, dir)
-		if not (puncher:is_player() and puncher:get_player_name(puncher)==self.username) and tool_capabilities and tool_capabilities.damage_groups and tool_capabilities.damage_groups.fleshy then
+		if not self.user then
+			self.object:remove()
+		elseif not (puncher:is_player() and puncher:get_player_name(puncher)==self.username) and tool_capabilities and tool_capabilities.damage_groups and tool_capabilities.damage_groups.fleshy then
 			self.user:set_hp(self.user:get_hp()-tool_capabilities.damage_groups.fleshy)
 		end
 		return self
@@ -294,8 +301,21 @@ minetest.register_node("mt2d:blocking", {
 	drawtype="airlike",
 	paramtype="light",
 	pointable=false,
+	on_blast = function(pos, intensity)
+		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
+	end,
 	after_destruct = function(pos, oldnode)
-		minetest.set_node(pos,oldnode)
+		local m=minetest.get_meta(pos)
+		if m:get_int("reset")==0 then
+			minetest.after(1, function(pos)
+				minetest.set_node(pos,{name="mt2d:blocking"})
+				m:set_int("reset",1)
+				minetest.get_node_timer(pos):start(1)
+			end,pos)
+		end
+	end,
+	on_timer = function (pos, elapsed)
+		minetest.get_meta(pos):set_int("reset",0)
 	end,
 })
 
@@ -330,9 +350,6 @@ minetest.register_entity("mt2d:path" .. i,{
 })
 end
 paths=nil
-
-
-
 
 minetest.register_on_generated(function(minp, maxp, seed)
 	local air=minetest.get_content_id("air")
@@ -371,4 +388,42 @@ mt2d.punch=function(ob1,ob2,hp)
 	else
 		ob1:punch(ob2,1,{full_punch_interval=1,damage_groups={fleshy=hp}})
 	end	
+end
+
+minetest.spawn_item=function(pos, item)
+
+	local e=minetest.add_entity(pos, "__builtin:item")
+	if e then
+		e:get_luaentity():set_item(ItemStack(item):to_string())
+		minetest.after(0, function(e)
+			local self=e:get_luaentity()
+			if self and self.dropped_by and mt2d.user[self.dropped_by] then
+				local ob=mt2d.user[self.dropped_by].object
+				local yaw=math.floor(ob:get_yaw()*10)*0.1
+				local v={x=0,y=0,z=0}
+				local p=ob:get_pos()
+
+				if yaw==4.7 then
+					v.x=2
+				elseif yaw==1.5 then
+					v.x=-2
+				else
+					v.x=0
+				end
+
+				e:set_pos({x=pos.x+(v.x/2),y=pos.y-0.5,z=0})
+				e:set_velocity({x=v.x,y=0,z=0})
+			end
+		end,e)
+
+		minetest.after(10, function(e)
+			if e and e:get_luaentity() then
+				local node=minetest.registered_nodes[minetest.get_node(e:get_pos()).name]
+				if node and node.damage_per_second>0 then
+					e:remove()
+				end
+			end
+		end,e)
+	end
+	return e
 end
