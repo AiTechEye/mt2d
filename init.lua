@@ -467,6 +467,7 @@ minetest.register_node("mt2d:blocking", {
 	paramtype="light",
 	pointable=false,
 	mt2d=true,
+	groups={blockingsky=1},
 	on_blast = function(pos, intensity)
 		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
 	end,
@@ -490,15 +491,16 @@ minetest.register_node("mt2d:blocking_stone", {
 	paramtype="light",
 	pointable=false,
 	mt2d=true,
+	groups={blockingsky=1},
 	tiles={"default_stone.png^[colorize:#00000055"},
 	on_blast = function(pos, intensity)
-		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
+		minetest.registered_nodes["mt2d:blocking_stone"].after_destruct(pos)
 	end,
 	after_destruct = function(pos, oldnode)
 		local m=minetest.get_meta(pos)
 		if m:get_int("reset")==0 then
 			minetest.after(1, function(pos)
-				minetest.set_node(pos,{name="mt2d:blocking"})
+				minetest.set_node(pos,{name="mt2d:blocking_stone"})
 				m:set_int("reset",1)
 				minetest.get_node_timer(pos):start(1)
 			end,pos)
@@ -514,15 +516,16 @@ minetest.register_node("mt2d:blocking_sky", {
 	paramtype="light",
 	pointable=false,
 	mt2d=true,
+	groups={blockingsky=1},
 	tiles={"default_cloud.png^[colorize:#9ee7ffff"},
 	on_blast = function(pos, intensity)
-		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
+		minetest.registered_nodes["mt2d:blocking_sky"].after_destruct(pos)
 	end,
 	after_destruct = function(pos, oldnode)
 		local m=minetest.get_meta(pos)
 		if m:get_int("reset")==0 then
 			minetest.after(1, function(pos)
-				minetest.set_node(pos,{name="mt2d:blocking"})
+				minetest.set_node(pos,{name="mt2d:blocking_sky"})
 				m:set_int("reset",1)
 				minetest.get_node_timer(pos):start(1)
 			end,pos)
@@ -530,5 +533,21 @@ minetest.register_node("mt2d:blocking_sky", {
 	end,
 	on_timer = function (pos, elapsed)
 		minetest.get_meta(pos):set_int("reset",0)
+	end,
+})
+
+minetest.register_lbm({
+	name = "mt2d:skyfix",
+	nodenames = {"group:blockingsky"},
+	--run_at_every_load=true,
+	action = function(pos, node)
+		for x=-1,1,2 do
+		for y=-1,1,2 do
+			local p={x=pos.x+x,y=pos.y+y,z=pos.z}
+			if minetest.get_item_group(minetest.get_node(p).name,"blockingsky")~=1 then
+				minetest.set_node(p, node)
+			end
+		end
+		end
 	end,
 })
