@@ -23,7 +23,10 @@ minetest.after(0.1, function()
 		minetest.registered_entities["__builtin:item"].on_activate2(self, staticdata,time)
 			minetest.after(0, function(self)
 				if self and self.object then
-					self.object:set_properties({automatic_rotate=0})
+					self.object:set_properties({
+						automatic_rotate=0,
+						collisionbox={-0.2,-0.2,0,0.2,0.2,0},
+					})
 					local pos=self.object:get_pos()
 					self.object:set_pos({x=pos.x,y=pos.y,z=0})
 				end
@@ -586,7 +589,6 @@ minetest.register_node("mt2d:blocking", {
 minetest.register_node("mt2d:blocking_stone", {
 	description = "blocking stone",
 	paramtype="light",
-	pointable=false,
 	mt2d=true,
 	groups={blockingsky=1},
 	tiles={"default_stone.png^[colorize:#00000055"},
