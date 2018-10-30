@@ -33,10 +33,14 @@ minetest.after(0.1, function()
 					type = "fixed",
 					fixed = {{-0.5, -0.5, 0, 0.5, 0.5, 0}},
 				},
-				--selection_box = {
-				--	type = "fixed",
-				--	fixed = {{-0.5, -0.5, 0, 0.5, 0.5, 0}},
-				--}
+				selection_box = {
+					type = "fixed",
+					fixed = {{-0.5, -0.5, -5, 0.5, 0.5, 0}},
+				},
+				collision_box = {
+					type = "fixed",
+					fixed = {{-0.5, -0.5, -0.5, 0.5, 0.5, 0.5}},
+				},
 			})
 		end
 	end
@@ -288,6 +292,7 @@ minetest.register_entity("mt2d:cam",{
 			self.ob:set_yaw(1.57)
 		elseif key.RMB or key.LMB then
 			mt2d.player_anim(self,"mine")
+			v.x=0
 		elseif key.aux1 and 	minetest.check_player_privs(self.username, {leave2d=true}) then
 			mt2d.to_3dplayer(self.user)
 			return
@@ -397,7 +402,7 @@ end
 minetest.register_entity("mt2d:player",{
 	hp_max = 20,
 	physical = true,
-	collisionbox = {-0.35,-1,-0.35,0.35,0.8,0.35},
+	collisionbox = {-0.35,-1,-0,0.35,0.8,0},
 	visual =  "mesh",
 	mesh = "mt2d_character.b3d",
 	textures = {"mt2d_air.png","mt2d_air.png"},
@@ -491,7 +496,6 @@ mt2d.punch=function(ob1,ob2,hp)
 end
 
 minetest.spawn_item=function(pos, item)
-
 	local e=minetest.add_entity(pos, "__builtin:item")
 	if e then
 		e:get_luaentity():set_item(ItemStack(item):to_string())
@@ -516,7 +520,6 @@ minetest.spawn_item=function(pos, item)
 				e:set_properties({
 					visual="wielditem",
 					automatic_rotate=0,
-					--collisionbox={-0.5, -0.5, -0.2, 0.5, 0.5, 0.2},
 					textures=e:get_properties().textures
 				})
 			end
@@ -541,9 +544,6 @@ minetest.register_node("mt2d:blocking", {
 	pointable=false,
 	mt2d=true,
 	groups={blockingsky=1},
-	on_blast = function(pos, intensity)
-		minetest.registered_nodes["mt2d:blocking"].after_destruct(pos)
-	end,
 	after_destruct = function(pos, oldnode)
 		local m=minetest.get_meta(pos)
 		if m:get_int("reset")==0 then
@@ -566,6 +566,7 @@ minetest.register_node("mt2d:blocking_stone", {
 	mt2d=true,
 	groups={blockingsky=1},
 	tiles={"default_stone.png^[colorize:#00000055"},
+	drawtype="nodebox",
 	on_blast = function(pos, intensity)
 		minetest.registered_nodes["mt2d:blocking_stone"].after_destruct(pos)
 	end,
@@ -587,10 +588,10 @@ minetest.register_node("mt2d:blocking_stone", {
 minetest.register_node("mt2d:blocking_sky", {
 	description = "blocking sky",
 	paramtype="light",
-	pointable=false,
 	mt2d=true,
 	groups={blockingsky=1},
 	tiles={"default_cloud.png^[colorize:#9ee7ffff"},
+	drawtype="nodebox",
 	on_blast = function(pos, intensity)
 		minetest.registered_nodes["mt2d:blocking_sky"].after_destruct(pos)
 	end,
@@ -624,3 +625,22 @@ minetest.register_lbm({
 		end
 	end,
 })
+
+
+minetest.register_on_placenode(function(pos, newnode, placer, oldnode, itemstack, pointed_thing)
+	local ppos=placer:get_pos()
+
+	if pos.x==math.floor(ppos.x+0.5) and (pos.y==math.floor(ppos.y) or pos.y==math.floor(ppos.y+1)) then
+		minetest.set_node(pos,oldnode)
+		return true
+	end
+	for x=-1,1,1 do
+	for y=-1,1,1 do
+		if x+y~=0 and minetest.get_node({x=pos.x+x,y=pos.y+y,z=0}).name~="air" then
+			return
+		end
+	end
+	end
+	minetest.set_node(pos,oldnode)
+	return true
+end)
