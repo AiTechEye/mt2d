@@ -18,6 +18,18 @@ minetest.register_privilege("leave2d", {
 })
 
 minetest.after(0.1, function()
+	minetest.registered_entities["__builtin:item"].on_activate2=minetest.registered_entities["__builtin:item"].on_activate
+	minetest.registered_entities["__builtin:item"].on_activate=function(self, staticdata,time)
+		minetest.registered_entities["__builtin:item"].on_activate2(self, staticdata,time)
+			minetest.after(0, function(self)
+				if self and self.object then
+					self.object:set_properties({automatic_rotate=0})
+					local pos=self.object:get_pos()
+					self.object:set_pos({x=pos.x,y=pos.y,z=0})
+				end
+			end,self)
+		return self
+	end
 	for i, v in pairs(minetest.registered_items) do
 		if not v.ragne or v.ragne<6 then
 			minetest.override_item(i, {range=6})
@@ -43,6 +55,22 @@ minetest.after(0.1, function()
 				},
 			})
 		end
+	end
+	if sethome then
+	sethome.go=function(name)
+		local pos=sethome.get(name)
+		if pos and mt2d.user[name] then
+			pos.z=0
+			pos.y=pos.y+1
+			mt2d.user[name].object:set_pos(pos)
+			return true
+		elseif not pos then
+			return false
+		else
+			minetest.chat_send_player(name,"You can't go home in 3D mode")
+			return true
+		end
+	end
 	end
 end)
 
@@ -318,15 +346,17 @@ minetest.register_entity("mt2d:cam",{
 			else
 				v.y=0
 			end
-			if not self.noclip_enabled then
+			self.flying=true
+			if self.noclip and not self.noclip_enabled then
 				v={x=0.1,y=8,z=0}
 				self.noclip_enabled=true
 				self.ob:set_properties({physical=false})
 			end
 			v.x=v.x*2
 			self.fallingfrom=nil
-		elseif self.noclip_enabled then
+		elseif self.noclip_enabled or self.flying then
 			self.noclip_enabled=nil
+			self.flying=nil
 			self.ob:set_properties({physical=true})
 			self.ob:set_acceleration({x=0,y=-20,z=0})
 		elseif key.sneak and v.x~=0 then
@@ -488,8 +518,6 @@ mt2d.punch=function(ob1,ob2,hp)
 	hp=hp or 1
 	if ob1:is_player() then
 		ob1:set_hp(ob1:get_hp()-hp)
-	elseif ob1:get_luaentity() and ob1:get_luaentity().itemstring then
-		ob:remove() return
 	else
 		ob1:punch(ob2,1,{full_punch_interval=1,damage_groups={fleshy=hp}})
 	end	
@@ -517,11 +545,7 @@ minetest.spawn_item=function(pos, item)
 
 				e:set_pos({x=pos.x+(v.x/2),y=pos.y-0.5,z=0})
 				e:set_velocity({x=v.x,y=0,z=0})
-				e:set_properties({
-					visual="wielditem",
-					automatic_rotate=0,
-					textures=e:get_properties().textures
-				})
+
 			end
 		end,e)
 
