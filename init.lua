@@ -34,8 +34,8 @@ minetest.after(0.1, function()
 		return self
 	end
 	for i, v in pairs(minetest.registered_items) do
-		if not v.ragne or v.ragne<6 then
-			minetest.override_item(i, {range=6})
+		if not v.ragne or v.ragne<8 then
+			minetest.override_item(i, {range=8})
 		end
 	end
 	for i, v in pairs(minetest.registered_nodes) do
