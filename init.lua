@@ -115,8 +115,74 @@ minetest.register_on_respawnplayer(function(player)
 	end,player)
 end)
 
+minetest.register_tool("mt2d:a", {
+	description = "Terminal",
+	inventory_image = "aliveai_terminal.png",
+	on_use=function(itemstack, user, pointed_thing)
+		mt2d.get_nodes_radius(pointed_thing.under,9)
+	end,
+
+})
+
+mt2d.get_nodes_radius=function(pos,rad)
+	rad=rad or 2
+	local nodes={}
+	local p
+	for r=0,rad,1.5 do
+	for a=-r,r,0.5 do
+		p={	x=pos.x+(math.cos(a)*r)*0.5,
+			y=pos.y+(math.sin(a)*r)*0.5,
+			z=0
+		}
+		nodes[minetest.pos_to_string(p)]=p
+	end
+	end
+	return nodes
+end
+
 minetest.register_on_dieplayer(function(player)
 	player:set_detach()
+
+	minetest.after(0.1, function(player)
+		local bones_pos=minetest.find_node_near(player:get_pos(), 2, {"bones:bones"})
+
+
+		if bones_pos then
+			local bones=minetest.get_node(bones_pos)
+			--local replace_pos={x=bones_pos.x,y=bones_pos.y,z=0}
+			local name=player:get_player_name()
+
+			for i, replace_pos in pairs(mt2d.get_nodes_radius(bones_pos,15)) do
+
+
+
+				local replace=minetest.get_node(replace_pos).name
+				
+
+				if (minetest.registered_nodes[replace] and minetest.registered_nodes[replace].buildable_to) then
+					minetest.set_node(replace_pos,bones)
+					minetest.get_meta(replace_pos):from_table(minetest.get_meta(bones_pos):to_table())
+					minetest.set_node(bones_pos,{name="air"})
+					return
+				end
+			end
+
+			local replace_pos={x=bones_pos.x,y=bones_pos.y,z=0}
+			local replace=minetest.get_node(replace_pos).name
+
+			if minetest.is_protected(replace_pos, name)==false and
+			(minetest.get_item_group(replace,"stone")>0
+			or minetest.get_item_group(replace,"soil")>0
+			or minetest.get_item_group(replace,"sand")>0) then
+				minetest.set_node(replace_pos,bones)
+				minetest.get_meta(replace_pos):from_table(minetest.get_meta(bones_pos):to_table())
+				minetest.get_meta(replace_pos):get_inventory():add_item("main",{name=replace})
+				minetest.set_node(bones_pos,{name="air"})
+				return
+			end
+
+		end
+	end,player)
 end)
 
 minetest.register_on_leaveplayer(function(player)
