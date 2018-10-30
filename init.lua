@@ -199,6 +199,9 @@ minetest.register_entity("mt2d:cam",{
 			self.ob:get_luaentity().id=self.id
 			self.ob:get_luaentity().username=self.username
 
+			self.fly=minetest.check_player_privs(self.username, {fly=true})
+			self.noclip=minetest.check_player_privs(self.username, {noclip=true})
+
 			self.ob:set_properties({
 				textures={"mt2d_air.png",mt2d.user[self.username].texture},
 				nametag=self.username,
@@ -266,8 +269,7 @@ minetest.register_entity("mt2d:cam",{
 			local hit=math.floor(pos.y+0.5)
 			local d=from-hit
 			self.fallingfrom=nil
-
-			if d>=10 then
+			if minetest.get_node({x=pos2.x,y=pos2.y-2,z=0}).name~="ignore" and d>=10 then
 				mt2d.punch(self.ob,self.ob,d)
 			end
 		end
@@ -300,6 +302,30 @@ minetest.register_entity("mt2d:cam",{
 			if key.down then
 				v.y=-2
 			end
+		end
+
+		if self.fly and key.sneak then
+			self.ob:set_acceleration({x=0,y=0,z=0})
+			if key.up then
+				v.y=8
+			elseif key.down then
+				v.y=-8
+			else
+				v.y=0
+			end
+			if not self.noclip_enabled then
+				v={x=0.1,y=8,z=0}
+				self.noclip_enabled=true
+				self.ob:set_properties({physical=false})
+			end
+			v.x=v.x*2
+			self.fallingfrom=nil
+		elseif self.noclip_enabled then
+			self.noclip_enabled=nil
+			self.ob:set_properties({physical=true})
+			self.ob:set_acceleration({x=0,y=-20,z=0})
+		elseif key.sneak and v.x~=0 then
+			v.x=v.x/4
 		end
 
 		self.ob:set_velocity(v)
