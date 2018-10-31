@@ -18,6 +18,9 @@ minetest.register_privilege("leave2d", {
 })
 
 minetest.after(0.1, function()
+	minetest.unregister_item("boats:boat")
+	minetest.unregister_item("carts:cart")
+
 	minetest.registered_entities["__builtin:item"].on_activate2=minetest.registered_entities["__builtin:item"].on_activate
 	minetest.registered_entities["__builtin:item"].on_activate=function(self, staticdata,time)
 		minetest.registered_entities["__builtin:item"].on_activate2(self, staticdata,time)
