@@ -53,7 +53,7 @@ minetest.after(0.1, function()
 				},
 				selection_box = {
 					type = "fixed",
-					fixed = {{-0.5, -0.5, -5, 0.5, 0.5, 0}},
+					fixed = {{-0.5, -0.5, -0.5, 0.5, 0.5, 0}},
 				},
 				collision_box = {
 					type = "fixed",
@@ -673,3 +673,161 @@ minetest.register_on_placenode(function(pos, newnode, placer, oldnode, itemstack
 	minetest.set_node(pos,oldnode)
 	return true
 end)
+
+mt2d.registry_door=function(name,description,texture,groups,locked,sound_open,sound_close,sounds,replace)
+
+minetest.register_node("mt2d:door_" .. name .. "_a",{
+	description = description,
+	groups = groups,
+	drawtype="nodebox",
+	paramtype="light",
+	paramtype2 = "facedir",
+	tiles = {texture},
+	drop=replace,
+	sounds=sounds,
+	mt2d=true,
+	node_box = {
+		type="fixed",
+		fixed={0.4,-0.5,0,0.5,1.5,0}
+	},
+	selection_box={
+		type="fixed",
+		fixed={-0.5,-0.5,0,0.5,1.5,0}
+	},
+	collision_box={
+		type="fixed",
+		fixed={0.4,-0.5,-0.5,0.5,1.5,0.5}
+	},
+	on_rightclick = function(pos, node, player, itemstack, pointed_thing)
+		local meta=minetest.get_meta(pos)
+		local owner=meta:get_string("owner")
+		if owner~="" and owner~=player:get_player_name() then
+			return
+		end
+		minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_b"})
+		meta:set_int("p",meta:get_int("p"))
+		meta:set_string("owner",owner)
+		minetest.sound_play(sound_open,{pos=pos,gain=0.3,max_hear_distance=10})
+	end,
+	after_place_node = function(pos, placer)
+		local pname=placer:get_player_name()
+		local ob=mt2d.user[pname]
+		local meta=minetest.get_meta(pos)
+
+		if locked then
+			meta:set_string("owner",pname)
+		end
+
+		if ob and ob.object and ob.object:get_pos().x<pos.x then
+			minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_a", param2=0})
+		else
+			minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_a", param2=2})
+			meta:set_int("p",2)
+		end
+
+		if minetest.get_node({x=pos.x,y=pos.y+1,z=0}).name=="air" then
+			minetest.set_node({x=pos.x,y=pos.y+1,z=0}, {name = "air"})
+		end
+	end,
+})
+
+minetest.register_node("mt2d:door_" .. name .. "_b",{
+	description = description,
+	drop=replace,
+	groups = groups,
+	drawtype="nodebox",
+	paramtype="light",
+	paramtype2 = "facedir",
+	tiles = {texture},
+	sounds=sounds,
+	mt2d=true,
+	walkable=false,
+	node_box = {
+		type="fixed",
+		fixed={-0.5,-0.5,-0.1,0.5,1.5,-0.1}
+	},
+	on_rightclick = function(pos,node,player)
+		local meta=minetest.get_meta(pos)
+		local owner=meta:get_string("owner")
+		if owner~="" and owner~=player:get_player_name() then
+			return
+		end
+		minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_a",param2=meta:get_int("p")})
+		meta:set_int("p",meta:get_int("p"))
+		meta:set_string("owner",owner)
+		minetest.sound_play(sound_close,{pos=pos,gain=0.3,max_hear_distance=10})
+	end
+})
+
+	minetest.after(0.1, function(name,replace)
+		minetest.registered_items[replace].on_place=function(itemstack, user, pointed_thing)
+
+			if not pointed_thing.above or pointed_thing.above.z~=0 then
+				return itemstack
+			end
+
+			local pos=pointed_thing.above
+			pointed_thing.above={x=pos.x,y=pos.y,z=0}
+
+			local def=minetest.registered_nodes[minetest.get_node(pointed_thing.above).name]
+
+			if minetest.is_protected(pointed_thing.above,user:get_player_name()) or not def or def.buildable_to==false then
+				return itemstack
+			else
+				itemstack:take_item()
+			end
+			minetest.registered_items["mt2d:door_" .. name .. "_a"].after_place_node(pointed_thing.above,user)
+			return itemstack
+		end
+	end,name,replace)
+
+
+end
+
+mt2d.registry_door(
+	"wood",
+	"Wooden door",
+	"default_wood.png",
+	{choppy = 2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1},
+	false,
+	"doors_door_open",
+	"doors_door_close",
+	default.node_sound_wood_defaults(),
+	"doors:door_wood"
+)
+
+mt2d.registry_door(
+	"glass",
+	"Glass door",
+	"default_glass.png",
+	{ckracky=2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1},
+	false,
+	"doors_glass_door_open",
+	"doors_glass_door_close",
+	default.node_sound_glass_defaults(),
+	"doors:door_glass"
+)
+
+mt2d.registry_door(
+	"steel",
+	"Steel door",
+	"default_steel_block.png",
+	{cracky=1,not_in_creative_inventory=1},
+	true,
+	"doors_steel_door_open",
+	"doors_steel_door_close",
+	default.node_sound_metal_defaults(),
+	"doors:door_steel"
+)
+
+mt2d.registry_door(
+	"obsidian_glass",
+	"Obsidian glass door",
+	"default_obsidian_glass.png",
+	{cracky= 1,not_in_creative_inventory=1},
+	false,
+	"doors_glass_door_open",
+	"doors_glass_door_close",
+	default.node_sound_glass_defaults(),
+	"doors:door_obsidian_glass"
+)
