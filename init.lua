@@ -125,7 +125,6 @@ minetest.register_globalstep(function(dtime)
 		if u.player:get_player_control().aux1 then
 			mt2d.new_player(u.player)
 			mt2d.user3d[name].timeout=true
-
 			minetest.after(2, function(name)
 				mt2d.user3d[name]=nil
 			end,name)
@@ -271,7 +270,7 @@ minetest.register_entity("mt2d:cam",{
 				mt2d.punch(self.user,self.ob,node.damage_per_second)
 			end
 		end
-
+--breath
 		if node2.drowning>0 then
 			self.breath=self.breath-dtime
 			self.user:set_breath(self.breath)
@@ -287,7 +286,7 @@ minetest.register_entity("mt2d:cam",{
 			self.breath=self.breath+dtime
 			self.user:set_breath(self.breath)
 		end
-
+--physics
 		if node.liquid_viscosity>0 or node.climbable then
 			if v.y<-0.1 then
 				v={x = v.x*0.99, y =v.y*0.99, z =v.z*0.99}
@@ -311,9 +310,18 @@ minetest.register_entity("mt2d:cam",{
 				mt2d.punch(self.ob,self.ob,d)
 			end
 		end
-
+--input & anim
 		if self.ob:get_luaentity().dead then
 			return self
+		elseif self.laying then
+			v={x=0,y=0,z=0}
+			self.ob:set_acceleration({x=0,y=0,z=0})
+			mt2d.player_anim(self,"lay")
+			if key.up or key.left or key.right or self.wakeup then
+				self.laying=nil
+				self.wakeup=nil
+				self.ob:set_acceleration({x=0,y=-20,z=0})
+			end
 		elseif key.up and (v.y==0 or self.floating) then
 			v.y=8
 		elseif key.left then
@@ -368,7 +376,7 @@ minetest.register_entity("mt2d:cam",{
 		elseif key.sneak and v.x~=0 then
 			v.x=v.x/4
 		end
-
+--movment
 		self.ob:set_velocity(v)
 		self.object:set_velocity({x=((pos2.x-pos.x)*10)+self.user_pos.x,y=(-0.5+(pos2.y-pos.y))*10,z=(5-(pos.z-pos2.z))*10})
 		local yaw=self.user:get_look_yaw()
@@ -724,10 +732,6 @@ minetest.register_node("mt2d:door_" .. name .. "_a",{
 			minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_a", param2=2})
 			meta:set_int("p",2)
 		end
-
-		if minetest.get_node({x=pos.x,y=pos.y+1,z=0}).name=="air" then
-			minetest.set_node({x=pos.x,y=pos.y+1,z=0}, {name = "air"})
-		end
 	end,
 })
 
@@ -771,7 +775,7 @@ minetest.register_node("mt2d:door_" .. name .. "_b",{
 
 			local def=minetest.registered_nodes[minetest.get_node(pointed_thing.above).name]
 
-			if minetest.is_protected(pointed_thing.above,user:get_player_name()) or not def or def.buildable_to==false then
+			if minetest.is_protected(pointed_thing.above,user:get_player_name()) or not def or def.buildable_to==false or minetest.get_node({x=pos.x,y=pos.y+1,z=0}).name~="air" then
 				return itemstack
 			else
 				itemstack:take_item()
@@ -831,3 +835,69 @@ mt2d.registry_door(
 	default.node_sound_glass_defaults(),
 	"doors:door_obsidian_glass"
 )
+
+for i, t in pairs({{"bed","Bed"},{"fancy_bed","Fancy bed"}}) do
+minetest.register_node("mt2d:" .. t[1],{
+	description = t[1],
+	groups = {choppy = 2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1},
+	drawtype="nodebox",
+	paramtype="light",
+	tiles = {"mt2d_" .. t[1] ..".png"},
+	sounds=default.node_sound_wood_defaults(),
+	mt2d=true,
+	walkable=false,
+	node_box = {
+		type="fixed",
+		fixed={-0.5,-0.5,0,1.5,0.25,0}
+	},
+	on_rightclick = function(pos,node,player)
+		local name=player:get_player_name()
+		if not mt2d.user[name] and mt2d.user[name].object then
+			return
+		end
+		mt2d.user[name].object:set_pos({x=pos.x+0.5,y=pos.y+1.2,z=0})
+		mt2d.user[name].cam:get_luaentity().laying=true
+		minetest.get_node_timer(pos):start(10)
+	end,
+	on_timer = function (pos, elapsed)
+		local time=minetest.get_timeofday()
+		local time_is=time<0.2 or time>0.8
+		local lay
+
+		for _, ob in ipairs(minetest.get_objects_inside_radius(pos, 2)) do
+			local en=ob:get_luaentity()
+			if en and en.username and mt2d.user[en.username] and mt2d.user[en.username].cam and mt2d.user[en.username].cam:get_luaentity().laying then
+				lay=true
+				break
+			end
+		end
+
+		if not lay then
+			return false
+		elseif not time_is then
+			return true
+		end
+
+		for i, u in pairs(mt2d.user) do
+			if u.cam and u.cam:get_luaentity() then
+				if not u.cam:get_luaentity().laying then
+					return true
+				end
+			end
+		end
+		minetest.set_timeofday(0.23)
+		for i, u in pairs(mt2d.user) do
+			if u.cam and u.cam:get_luaentity() and u.cam:get_luaentity().laying then
+				u.cam:get_luaentity().wakeup=true
+			end
+		end
+	end
+})
+	minetest.after(0.1, function()
+		minetest.registered_nodes["beds:" .. t[1]].on_place=function(itemstack, user, pointed_thing)
+			local pos=pointed_thing.above
+			if not pos or minetest.get_node({x=pos.x-1,y=pos.y,z=0}).name~="air" then return false end
+			minetest.set_node(pos,{name="mt2d:" .. t[1]})
+		end
+	end)
+end
