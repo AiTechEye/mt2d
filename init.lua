@@ -1,7 +1,8 @@
 mt2d={
 	timer=0,
-	user3d={},
-	user={},
+	user3d={},	--3d users
+	user={},		--users data
+	attach={},	--attached objects (pushing them)
 	playeranim={
 		stand={x=1,y=39,speed=30},
 		walk={x=41,y=61,speed=30},
@@ -21,7 +22,6 @@ minetest.register_privilege("leave2d", {
 })
 
 minetest.after(0.1, function()
-	minetest.unregister_item("boats:boat")
 	minetest.unregister_item("carts:cart")
 
 	minetest.registered_entities["__builtin:item"].on_activate2=minetest.registered_entities["__builtin:item"].on_activate
@@ -122,6 +122,19 @@ mt2d.to_3dplayer=function(player)
 end
 
 minetest.register_globalstep(function(dtime)
+	for name, a in pairs(mt2d.attach) do
+		if not (mt2d.user[name] or mt2d.user[name].id==a.id) or not (a.ob1:get_pos() and a.ob2:get_pos()) then
+			minetest.after(0, function(name)
+				mt2d.attach[name]=nil
+			end,name)
+			break
+		end
+
+		local pos1=a.ob1:get_pos()
+		local pos2=a.ob2:get_pos()
+		a.ob2:set_velocity({x=((pos1.x-pos2.x)+a.pos.x)*10,y=((pos1.y-pos2.y)+a.pos.y)*10,z=((pos1.z-pos2.z)+a.pos.z)*10})
+	end
+
 	mt2d.timer=mt2d.timer+dtime
 	if mt2d.timer<2 then return end
 	mt2d.timer=0
@@ -352,4 +365,24 @@ mt2d.get_nodes_radius=function(pos,rad)
 	end
 	end
 	return nodes
+end
+
+mt2d.set_attach=function(name,object,object_to_attach,pos)
+	pos=pos or {}
+	pos={x=pos.x or 0,y=pos.y or 0,z=pos.z or 0}
+	mt2d.attach[name]={
+		name=name,
+		id=mt2d.user[name].id,
+		ob1=object,
+		ob2=object_to_attach,
+		pos=pos or {x=0,y=0,z=0}
+	}
+end
+
+mt2d.get_attach=function(name)
+	return mt2d.attach[name]
+end
+
+mt2d.set_dettach=function(name)
+	mt2d.attach[name]=nil
 end

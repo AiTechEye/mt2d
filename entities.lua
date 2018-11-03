@@ -108,7 +108,8 @@ minetest.register_entity("mt2d:cam",{
 			end
 		end
 --input & anim
-		if self.ob:get_luaentity().dead then
+		if self.ob:get_luaentity().dead or mt2d.attach[self.username] then
+			self.object:set_velocity({x=((pos2.x-pos.x)*10)+self.user_pos.x,y=(-0.5+(pos2.y-pos.y))*10,z=(5-(pos.z-pos2.z))*10})
 			return self
 		elseif self.laying then
 			v={x=0,y=0,z=0}
@@ -272,3 +273,132 @@ minetest.register_entity("mt2d:player",{
 	team="Sam",
 	timer=0,
 })
+
+minetest.register_entity("mt2d:boat",{
+	hp_max = 10,
+	physical = true,
+	visual =  "upright_sprite",
+	collisionbox = {-0.9,-0.1,0,0.9,1.25,0},
+	visual_size={x=1.8,y=0.2},
+	textures = {"default_wood.png"},
+	is_visible = true,
+	makes_footstep_sound = false,
+	on_rightclick=function(self, clicker,name)
+		local name=clicker:get_player_name()
+		if not self.user and mt2d.user[name] and mt2d.user[name].object then
+			self.user=clicker
+			self.username=name
+			self.id=mt2d.user[name].id
+			self.ob=mt2d.user[name].object
+			mt2d.player_anim(self,"sit")
+			mt2d.set_attach(name,self.object,self.ob,{y=0.8})
+		elseif self.user and self.username==name then
+			self.user=nil
+			self.username=nil
+			self.id=nil
+			self.ob=nil
+			mt2d.set_dettach(name)
+			self.anim=nil
+		end
+	end,
+	on_punch=function(self, puncher, time_from_last_punch, tool_capabilities, dir)
+
+		tool_capabilities.damage_groups.fleshy=tool_capabilities.damage_groups.fleshy or 1
+
+		if not self.user then
+			if puncher:get_inventory() then
+				puncher:get_inventory():add_item("main","boats:boat")
+			else
+				minetest.add_item(self.object:get_pos(),"boats:boat")
+			end
+			self.object:remove()
+		elseif self.object:get_hp()-tool_capabilities.damage_groups.fleshy<=0 then
+			self.anim=nil
+			mt2d.set_dettach(self.username)
+			mt2d.player_anim(self,"stand")
+		end
+	end,
+	on_step=function(self, dtime)
+		if self.timer>0 then
+			self.timer=self.timer+dtime
+			if self.timer>1 then
+				self.timer=0.001
+			else
+				return self
+			end
+		end
+		local v=self.object:get_velocity()
+		local pos=self.object:get_pos()
+		local l=minetest.registered_nodes[minetest.get_node({x=pos.x,y=pos.y,z=0}).name]
+		local lu=minetest.registered_nodes[minetest.get_node({x=pos.x,y=pos.y-1,z=0}).name]
+
+		if l and l.liquid_viscosity>0 then 
+			v.y=1
+			self.object:set_acceleration({x=0,y=0,z=0})
+			self.delaytimer=0
+		elseif lu and lu.liquid_viscosity==0 then
+			self.object:set_acceleration({x=0,y=-20,z=0})
+			self.delaytimer=0
+		else
+			self.delaytimer=self.delaytimer+dtime
+			self.object:set_acceleration({x=0,y=0,z=0})
+			v.y=0
+			if self.delaytimer>10 then
+				self.timer=0.001
+			else
+				self.timer=0
+			end
+		end
+
+		self.object:set_velocity(v)
+
+		if not self.user then
+			if math.abs(v.x)>0.2 then
+				v.x=v.x*0.99
+				self.object:set_velocity(v)
+			end
+			return self
+		elseif self.id~=mt2d.user[self.username].id then --or not (self.ob and self.ob:get_attach())
+			mt2d.set_dettach(self.username)
+			self.user=nil
+			self.username=nil
+			self.id=nil
+			self.ob=nil
+			return self
+		end
+
+		local key=self.user:get_player_control()
+
+		if key.left and v.x<4 then
+			v.x=v.x+0.1
+			self.delaytimer=0
+			self.ob:set_yaw(4.71)
+		elseif key.right and v.x>-4 then
+			v.x=v.x-0.1
+			self.delaytimer=0
+			self.ob:set_yaw(1.57)
+		elseif not (key.right or key.left) and math.abs(v.x)>0.2 then
+			v.x=v.x*0.99
+			self.delaytimer=0
+		end
+		self.object:set_velocity(v)
+	end,
+	timer=0,
+	delaytimer=0,
+	type="npc",
+	team="Sam",
+})
+
+minetest.after(0.1, function()
+	minetest.override_item("boats:boat", {
+		on_place=function(itemstack, user, pointed_thing)
+			local pos=pointed_thing.under
+			if not pos then return end
+			local l=minetest.registered_nodes[minetest.get_node(pos).name]
+			if not (l and l.liquid_viscosity>0) then return end
+			itemstack:take_item()
+			minetest.add_entity({x=pos.x,y=pos.y,z=0.05}, "mt2d:boat")
+			return itemstack
+		end,
+	})
+end)

@@ -2,14 +2,8 @@ minetest.register_node("mt2d:blocking", {
 	description = "blocking",
 	drawtype="airlike",
 	pointable=false,
-	--liquids_pointable=false,
 	mt2d=true,
 	groups={blockingsky=1},
-	--drawtype = "liquid",
-	--liquidtype = "source",
-	--liquid_range = 0,
-	--liquid_alternative_flowing = "mt2d:blocking",
-	--liquid_alternative_source = "mt2d:blocking",
 	after_destruct = function(pos, oldnode)
 		local m=minetest.get_meta(pos)
 		if m:get_int("reset")==0 then
@@ -71,7 +65,6 @@ minetest.register_node("mt2d:blocking_stone", {
 
 minetest.register_node("mt2d:blocking_sky", {
 	description = "blocking sky",
-	--paramtype="light",
 	mt2d=true,
 	groups={blockingsky=1},
 	tiles={"default_cloud.png^[colorize:#9ee7ffff"},
