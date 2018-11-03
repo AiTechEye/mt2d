@@ -383,6 +383,6 @@ mt2d.get_attach=function(name)
 	return mt2d.attach[name]
 end
 
-mt2d.set_dettach=function(name)
+mt2d.set_detach=function(name)
 	mt2d.attach[name]=nil
 end

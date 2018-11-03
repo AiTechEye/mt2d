@@ -297,7 +297,7 @@ minetest.register_entity("mt2d:boat",{
 			self.username=nil
 			self.id=nil
 			self.ob=nil
-			mt2d.set_dettach(name)
+			mt2d.set_detach(name)
 			self.anim=nil
 		end
 	end,
@@ -314,7 +314,7 @@ minetest.register_entity("mt2d:boat",{
 			self.object:remove()
 		elseif self.object:get_hp()-tool_capabilities.damage_groups.fleshy<=0 then
 			self.anim=nil
-			mt2d.set_dettach(self.username)
+			mt2d.set_detach(self.username)
 			mt2d.player_anim(self,"stand")
 		end
 	end,
@@ -359,7 +359,7 @@ minetest.register_entity("mt2d:boat",{
 			end
 			return self
 		elseif self.id~=mt2d.user[self.username].id then --or not (self.ob and self.ob:get_attach())
-			mt2d.set_dettach(self.username)
+			mt2d.set_detach(self.username)
 			self.user=nil
 			self.username=nil
 			self.id=nil
