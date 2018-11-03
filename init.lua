@@ -12,6 +12,9 @@ mt2d={
 	},
 }
 
+dofile(minetest.get_modpath("mt2d") .. "/nodes_items.lua")
+dofile(minetest.get_modpath("mt2d") .. "/entities.lua")
+
 minetest.register_privilege("leave2d", {
 	description = "Leave Dimension",
 	give_to_singleplayer= false,
@@ -69,6 +72,7 @@ minetest.after(0.1, function()
 			pos.z=0
 			pos.y=pos.y+1
 			mt2d.user[name].object:set_pos(pos)
+			mt2d.user[name].cam:set_pos(pos)
 			return true
 		elseif not pos then
 			return false
@@ -141,36 +145,17 @@ minetest.register_on_joinplayer(function(player)
 end)
 
 minetest.register_on_respawnplayer(function(player)
-
 	minetest.after(0, function(player)
 		local pos=player:get_pos()
 		player:set_pos({x=pos.x,y=pos.y,z=5})
 	end,player)
-
 	minetest.after(1, function(player)
 		mt2d.new_player(player)
 	end,player)
 end)
 
-mt2d.get_nodes_radius=function(pos,rad)
-	rad=rad or 2
-	local nodes={}
-	local p
-	for r=0,rad,1.5 do
-	for a=-r,r,0.5 do
-		p={	x=pos.x+(math.cos(a)*r)*0.5,
-			y=pos.y+(math.sin(a)*r)*0.5,
-			z=0
-		}
-		nodes[minetest.pos_to_string(p)]=p
-	end
-	end
-	return nodes
-end
-
 minetest.register_on_dieplayer(function(player)
 	player:set_detach()
-
 	minetest.after(0.1, function(player)
 		local bones_pos=minetest.find_node_near(player:get_pos(), 2, {"bones:bones"})
 		if bones_pos then
@@ -208,195 +193,6 @@ minetest.register_on_leaveplayer(function(player)
 	mt2d.user[player:get_player_name()]=nil
 	mt2d.user3d[player:get_player_name()]=nil
 end)
-
-minetest.register_entity("mt2d:cam",{
-	hp_max = 99999,
-	collisionbox = {0,0,0,0,0,0},
-	visual =  "sprite",
-	textures ={"mt2d_air.png"},
-	on_activate=function(self, staticdata)
-		self.timer=0
-		self.dmgtimer=0
-		self.breath=11
-		self.user_pos={x=0,y=0,z=0}
-		return self
-	end,
-	on_step=function(self, dtime)
-		if self.start>0 then
-			self.start=self.start-dtime
-			return self
-		elseif not (self.user and mt2d.user[self.username] and mt2d.user[self.username].id==self.id ) then
-			self.object:remove()
-			return self
-		elseif not (self.ob and self.ob:get_luaentity()) then
-			local pos=self.object:get_pos()
-			self.ob=minetest.add_entity({x=pos.x,y=pos.y+1,z=pos.z-5}, "mt2d:player")
-
-			self.ob:get_luaentity().user=self.user
-			self.ob:get_luaentity().id=self.id
-			self.ob:get_luaentity().username=self.username
-
-			self.fly=minetest.check_player_privs(self.username, {fly=true})
-			self.noclip=minetest.check_player_privs(self.username, {noclip=true})
-
-			self.ob:set_properties({
-				textures={"mt2d_air.png",mt2d.user[self.username].texture},
-				nametag=self.username,
-				nametag_color="#FFFFFF"
-			})
-
-			self.user:set_properties({
-				textures="mt2d_air.png",
-				nametag="",
-			})
-
-			mt2d.user[self.username].object=self.ob
-		end
-
-		local pos=self.object:get_pos()
-		local pos2=self.ob:get_pos()
-		local key=self.user:get_player_control()
-
-		local v=self.ob:get_velocity()
-		local node=minetest.registered_nodes[minetest.get_node({x=pos2.x,y=pos2.y-1,z=0}).name]
-		local node2=minetest.registered_nodes[minetest.get_node({x=pos2.x,y=pos2.y+1,z=0}).name]
-
-		if not (node and node2) then return end
-
-		if node.damage_per_second>0 then
-			self.dmgtimer=self.dmgtimer+dtime
-			if self.dmgtimer>1 then
-				self.dmgtimer=0
-				mt2d.punch(self.user,self.ob,node.damage_per_second)
-			end
-		end
---breath
-		if node2.drowning>0 then
-			self.breath=self.breath-dtime
-			self.user:set_breath(self.breath)
-			if self.breath<=0 then
-				self.breath=0
-				self.dmgtimer=self.dmgtimer+dtime
-				if self.dmgtimer>1 then
-					self.dmgtimer=0
-					mt2d.punch(self.user,self.ob,1)
-				end
-			end
-		elseif self.breath<11 then
-			self.breath=self.breath+dtime
-			self.user:set_breath(self.breath)
-		end
---physics
-		if node.liquid_viscosity>0 or node.climbable then
-			if v.y<-0.1 then
-				v={x = v.x*0.99, y =v.y*0.99, z =v.z*0.99}
-			end
-			if not self.floating then
-				self.fallingfrom=nil
-				self.ob:set_acceleration({x=0,y=0,z=0})
-				self.floating=true
-			end
-		elseif self.floating then
-			self.ob:set_acceleration({x=0,y=-20,z =0})
-			self.floating=nil
-		elseif v.y<0 and not self.fallingfrom then
-			self.fallingfrom=pos.y
-		elseif self.fallingfrom and v.y==0 then
-			local from=math.floor(self.fallingfrom+0.5)
-			local hit=math.floor(pos.y+0.5)
-			local d=from-hit
-			self.fallingfrom=nil
-			if minetest.get_node({x=pos2.x,y=pos2.y-2,z=0}).name~="ignore" and d>=10 then
-				mt2d.punch(self.ob,self.ob,d)
-			end
-		end
---input & anim
-		if self.ob:get_luaentity().dead then
-			return self
-		elseif self.laying then
-			v={x=0,y=0,z=0}
-			self.ob:set_acceleration({x=0,y=0,z=0})
-			mt2d.player_anim(self,"lay")
-			if key.up or key.left or key.right or self.wakeup then
-				self.laying=nil
-				self.wakeup=nil
-				self.ob:set_acceleration({x=0,y=-20,z=0})
-			end
-		elseif key.up and (v.y==0 or self.floating) then
-			v.y=8
-		elseif key.left then
-			v.x=4
-			mt2d.player_anim(self,"walk")
-			self.ob:set_yaw(4.71)
-		elseif key.right then
-			v.x=-4
-			mt2d.player_anim(self,"walk")
-			self.ob:set_yaw(1.57)
-		elseif key.RMB or key.LMB then
-			mt2d.player_anim(self,"mine")
-			v.x=0
-		elseif key.aux1 and 	minetest.check_player_privs(self.username, {leave2d=true}) then
-			mt2d.to_3dplayer(self.user)
-			return
-		else
-			mt2d.player_anim(self,"stand")
-			v={x=0,y=v.y,z=0}
-		end
-
-		if self.floating then
-			v.x=v.x/2
-			v.y=v.y/2
-			if key.down then
-				v.y=-2
-			end
-		end
-
-		if self.fly and key.sneak then
-			self.ob:set_acceleration({x=0,y=0,z=0})
-			if key.up then
-				v.y=8
-			elseif key.down then
-				v.y=-8
-			else
-				v.y=0
-			end
-			self.flying=true
-			if self.noclip and not self.noclip_enabled then
-				v={x=0.1,y=8,z=0}
-				self.noclip_enabled=true
-				self.ob:set_properties({physical=false})
-			end
-			v.x=v.x*2
-			self.fallingfrom=nil
-		elseif self.noclip_enabled or self.flying then
-			self.noclip_enabled=nil
-			self.flying=nil
-			self.ob:set_properties({physical=true})
-			self.ob:set_acceleration({x=0,y=-20,z=0})
-		elseif key.sneak and v.x~=0 then
-			v.x=v.x/4
-		end
---movment
-		self.ob:set_velocity(v)
-		self.object:set_velocity({x=((pos2.x-pos.x)*10)+self.user_pos.x,y=(-0.5+(pos2.y-pos.y))*10,z=(5-(pos.z-pos2.z))*10})
-		local yaw=self.user:get_look_yaw()
-		local pitch=self.user:get_look_pitch()
-
-		local tyaw=math.abs(yaw-4.71)
-		local tpitch=math.abs(pitch)
-		local npointable=not mt2d.pointable(pos2,self.user)
-
-		if tyaw>0.5 or (npointable and tyaw>0.2) then
-			self.user:set_look_yaw(3.14+((yaw-4.71)*0.9))
-
-		elseif tpitch>0.5 or (npointable and tpitch>0.2) then
-			self.user:set_look_pitch((pitch*0.9)*-1)
-		end
-		return self
-	end,
-	start=0.1,
-	type="npc",
-})
 
 mt2d.pointable=function(p1,user)
 	local dir=user:get_look_dir()
@@ -442,57 +238,6 @@ mt2d.player_anim=function(self,typ)
 	end
 	return self
 end
-
-minetest.register_entity("mt2d:player",{
-	hp_max = 20,
-	physical = true,
-	collisionbox = {-0.35,-1,-0,0.35,0.8,0},
-	visual =  "mesh",
-	mesh = "mt2d_character.b3d",
-	textures = {"mt2d_air.png","mt2d_air.png"},
-	is_visible = true,
-	makes_footstep_sound = true,
-	on_activate=function(self, staticdata)
-		local rndlook={4.71,1.57}
-		self.object:set_yaw(rndlook[math.random(1,2)])
-		self.object:set_acceleration({x=0,y=-20,z =0})
-		return self
-	end,
-	on_punch=function(self, puncher, time_from_last_punch, tool_capabilities, dir)
-		if not self.user then
-			self.object:remove()
-		elseif not (puncher:is_player() and puncher:get_player_name(puncher)==self.username) and tool_capabilities and tool_capabilities.damage_groups and tool_capabilities.damage_groups.fleshy then
-			self.user:set_hp(self.user:get_hp()-tool_capabilities.damage_groups.fleshy)
-		end
-		return self
-	end,
-	on_step=function(self, dtime)
-		self.timer=self.timer+dtime
-		if self.start>0 then
-			self.start=self.start-dtime
-			return self
-		elseif not (mt2d.user[self.username] and mt2d.user[self.username].id==self.id) then
-			self.object:remove()
-			return self
-		elseif self.user:get_hp()<=0 then
-			self.ob=self.object
-			self.ob:get_luaentity().dead=true
-			mt2d.player_anim(self,"lay")
-		elseif self.timer>3 then
-			self.timer=0
-			if not self.user:get_attach() then
-				mt2d.new_player(self.user)
-				return
-			end
-		end
-	end,
-	id=0,
-	username="",
-	start=0.1,
-	type="npc",
-	team="Sam",
-	timer=0,
-})
 
 minetest.register_on_generated(function(minp, maxp, seed)
 	local air=minetest.get_content_id("air")
@@ -575,95 +320,6 @@ minetest.spawn_item=function(pos, item)
 	return e
 end
 
-minetest.register_node("mt2d:blocking", {
-	description = "blocking",
-	drawtype="airlike",
-	paramtype="light",
-	pointable=false,
-	mt2d=true,
-	groups={blockingsky=1},
-	after_destruct = function(pos, oldnode)
-		local m=minetest.get_meta(pos)
-		if m:get_int("reset")==0 then
-			minetest.after(1, function(pos)
-				minetest.set_node(pos,{name="mt2d:blocking"})
-				m:set_int("reset",1)
-				minetest.get_node_timer(pos):start(1)
-			end,pos)
-		end
-	end,
-	on_timer = function (pos, elapsed)
-		minetest.get_meta(pos):set_int("reset",0)
-	end,
-})
-
-minetest.register_node("mt2d:blocking_stone", {
-	description = "blocking stone",
-	paramtype="light",
-	mt2d=true,
-	groups={blockingsky=1},
-	tiles={"default_stone.png^[colorize:#00000055"},
-	drawtype="nodebox",
-	on_blast = function(pos, intensity)
-		minetest.registered_nodes["mt2d:blocking_stone"].after_destruct(pos)
-	end,
-	after_destruct = function(pos, oldnode)
-		local m=minetest.get_meta(pos)
-		if m:get_int("reset")==0 then
-			minetest.after(1, function(pos)
-				minetest.set_node(pos,{name="mt2d:blocking_stone"})
-				m:set_int("reset",1)
-				minetest.get_node_timer(pos):start(1)
-			end,pos)
-		end
-	end,
-	on_timer = function (pos, elapsed)
-		minetest.get_meta(pos):set_int("reset",0)
-	end,
-})
-
-minetest.register_node("mt2d:blocking_sky", {
-	description = "blocking sky",
-	paramtype="light",
-	mt2d=true,
-	groups={blockingsky=1},
-	tiles={"default_cloud.png^[colorize:#9ee7ffff"},
-	drawtype="nodebox",
-	on_blast = function(pos, intensity)
-		minetest.registered_nodes["mt2d:blocking_sky"].after_destruct(pos)
-	end,
-	after_destruct = function(pos, oldnode)
-		local m=minetest.get_meta(pos)
-		if m:get_int("reset")==0 then
-			minetest.after(1, function(pos)
-				minetest.set_node(pos,{name="mt2d:blocking_sky"})
-				m:set_int("reset",1)
-				minetest.get_node_timer(pos):start(1)
-			end,pos)
-		end
-	end,
-	on_timer = function (pos, elapsed)
-		minetest.get_meta(pos):set_int("reset",0)
-	end,
-})
-
-minetest.register_lbm({
-	name = "mt2d:skyfix",
-	nodenames = {"group:blockingsky"},
-	--run_at_every_load=true,
-	action = function(pos, node)
-		for x=-1,1,2 do
-		for y=-1,1,2 do
-			local p={x=pos.x+x,y=pos.y+y,z=pos.z}
-			if minetest.get_item_group(minetest.get_node(p).name,"blockingsky")~=1 then
-				minetest.set_node(p, node)
-			end
-		end
-		end
-	end,
-})
-
-
 minetest.register_on_placenode(function(pos, newnode, placer, oldnode, itemstack, pointed_thing)
 	local ppos=placer:get_pos()
 
@@ -682,222 +338,18 @@ minetest.register_on_placenode(function(pos, newnode, placer, oldnode, itemstack
 	return true
 end)
 
-mt2d.registry_door=function(name,description,texture,groups,locked,sound_open,sound_close,sounds,replace)
-
-minetest.register_node("mt2d:door_" .. name .. "_a",{
-	description = description,
-	groups = groups,
-	drawtype="nodebox",
-	paramtype="light",
-	paramtype2 = "facedir",
-	tiles = {texture},
-	drop=replace,
-	sounds=sounds,
-	mt2d=true,
-	node_box = {
-		type="fixed",
-		fixed={0.4,-0.5,0,0.5,1.5,0}
-	},
-	selection_box={
-		type="fixed",
-		fixed={-0.5,-0.5,0,0.5,1.5,0}
-	},
-	collision_box={
-		type="fixed",
-		fixed={0.4,-0.5,-0.5,0.5,1.5,0.5}
-	},
-	on_rightclick = function(pos, node, player, itemstack, pointed_thing)
-		local meta=minetest.get_meta(pos)
-		local owner=meta:get_string("owner")
-		if owner~="" and owner~=player:get_player_name() then
-			return
-		end
-		minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_b"})
-		meta:set_int("p",meta:get_int("p"))
-		meta:set_string("owner",owner)
-		minetest.sound_play(sound_open,{pos=pos,gain=0.3,max_hear_distance=10})
-	end,
-	after_place_node = function(pos, placer)
-		local pname=placer:get_player_name()
-		local ob=mt2d.user[pname]
-		local meta=minetest.get_meta(pos)
-
-		if locked then
-			meta:set_string("owner",pname)
-		end
-
-		if ob and ob.object and ob.object:get_pos().x<pos.x then
-			minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_a", param2=0})
-		else
-			minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_a", param2=2})
-			meta:set_int("p",2)
-		end
-	end,
-})
-
-minetest.register_node("mt2d:door_" .. name .. "_b",{
-	description = description,
-	drop=replace,
-	groups = groups,
-	drawtype="nodebox",
-	paramtype="light",
-	paramtype2 = "facedir",
-	tiles = {texture},
-	sounds=sounds,
-	mt2d=true,
-	walkable=false,
-	node_box = {
-		type="fixed",
-		fixed={-0.5,-0.5,-0.1,0.5,1.5,-0.1}
-	},
-	on_rightclick = function(pos,node,player)
-		local meta=minetest.get_meta(pos)
-		local owner=meta:get_string("owner")
-		if owner~="" and owner~=player:get_player_name() then
-			return
-		end
-		minetest.swap_node(pos, {name="mt2d:door_" .. name .. "_a",param2=meta:get_int("p")})
-		meta:set_int("p",meta:get_int("p"))
-		meta:set_string("owner",owner)
-		minetest.sound_play(sound_close,{pos=pos,gain=0.3,max_hear_distance=10})
+mt2d.get_nodes_radius=function(pos,rad)
+	rad=rad or 2
+	local nodes={}
+	local p
+	for r=0,rad,1.5 do
+	for a=-r,r,0.5 do
+		p={	x=pos.x+(math.cos(a)*r)*0.5,
+			y=pos.y+(math.sin(a)*r)*0.5,
+			z=0
+		}
+		nodes[minetest.pos_to_string(p)]=p
 	end
-})
-
-	minetest.after(0.1, function(name,replace)
-		minetest.registered_items[replace].on_place=function(itemstack, user, pointed_thing)
-
-			if not pointed_thing.above or pointed_thing.above.z~=0 then
-				return itemstack
-			end
-
-			local pos=pointed_thing.above
-			pointed_thing.above={x=pos.x,y=pos.y,z=0}
-
-			local def=minetest.registered_nodes[minetest.get_node(pointed_thing.above).name]
-
-			if minetest.is_protected(pointed_thing.above,user:get_player_name()) or not def or def.buildable_to==false or minetest.get_node({x=pos.x,y=pos.y+1,z=0}).name~="air" then
-				return itemstack
-			else
-				itemstack:take_item()
-			end
-			minetest.registered_items["mt2d:door_" .. name .. "_a"].after_place_node(pointed_thing.above,user)
-			return itemstack
-		end
-	end,name,replace)
-
-
-end
-
-mt2d.registry_door(
-	"wood",
-	"Wooden door",
-	"default_wood.png",
-	{choppy = 2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1},
-	false,
-	"doors_door_open",
-	"doors_door_close",
-	default.node_sound_wood_defaults(),
-	"doors:door_wood"
-)
-
-mt2d.registry_door(
-	"glass",
-	"Glass door",
-	"default_glass.png",
-	{ckracky=2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1},
-	false,
-	"doors_glass_door_open",
-	"doors_glass_door_close",
-	default.node_sound_glass_defaults(),
-	"doors:door_glass"
-)
-
-mt2d.registry_door(
-	"steel",
-	"Steel door",
-	"default_steel_block.png",
-	{cracky=1,not_in_creative_inventory=1},
-	true,
-	"doors_steel_door_open",
-	"doors_steel_door_close",
-	default.node_sound_metal_defaults(),
-	"doors:door_steel"
-)
-
-mt2d.registry_door(
-	"obsidian_glass",
-	"Obsidian glass door",
-	"default_obsidian_glass.png",
-	{cracky= 1,not_in_creative_inventory=1},
-	false,
-	"doors_glass_door_open",
-	"doors_glass_door_close",
-	default.node_sound_glass_defaults(),
-	"doors:door_obsidian_glass"
-)
-
-for i, t in pairs({{"bed","Bed"},{"fancy_bed","Fancy bed"}}) do
-minetest.register_node("mt2d:" .. t[1],{
-	description = t[1],
-	groups = {choppy = 2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1},
-	drawtype="nodebox",
-	paramtype="light",
-	tiles = {"mt2d_" .. t[1] ..".png"},
-	sounds=default.node_sound_wood_defaults(),
-	mt2d=true,
-	walkable=false,
-	node_box = {
-		type="fixed",
-		fixed={-0.5,-0.5,0,1.5,0.25,0}
-	},
-	on_rightclick = function(pos,node,player)
-		local name=player:get_player_name()
-		if not mt2d.user[name] and mt2d.user[name].object then
-			return
-		end
-		mt2d.user[name].object:set_pos({x=pos.x+0.5,y=pos.y+1.2,z=0})
-		mt2d.user[name].cam:get_luaentity().laying=true
-		minetest.get_node_timer(pos):start(10)
-	end,
-	on_timer = function (pos, elapsed)
-		local time=minetest.get_timeofday()
-		local time_is=time<0.2 or time>0.8
-		local lay
-
-		for _, ob in ipairs(minetest.get_objects_inside_radius(pos, 2)) do
-			local en=ob:get_luaentity()
-			if en and en.username and mt2d.user[en.username] and mt2d.user[en.username].cam and mt2d.user[en.username].cam:get_luaentity().laying then
-				lay=true
-				break
-			end
-		end
-
-		if not lay then
-			return false
-		elseif not time_is then
-			return true
-		end
-
-		for i, u in pairs(mt2d.user) do
-			if u.cam and u.cam:get_luaentity() then
-				if not u.cam:get_luaentity().laying then
-					return true
-				end
-			end
-		end
-		minetest.set_timeofday(0.23)
-		for i, u in pairs(mt2d.user) do
-			if u.cam and u.cam:get_luaentity() and u.cam:get_luaentity().laying then
-				u.cam:get_luaentity().wakeup=true
-			end
-		end
 	end
-})
-	minetest.after(0.1, function()
-		minetest.registered_nodes["beds:" .. t[1]].on_place=function(itemstack, user, pointed_thing)
-			local pos=pointed_thing.above
-			if not pos or minetest.get_node({x=pos.x-1,y=pos.y,z=0}).name~="air" then return false end
-			minetest.set_node(pos,{name="mt2d:" .. t[1]})
-		end
-	end)
+	return nodes
 end
