@@ -402,3 +402,30 @@ minetest.after(0.1, function()
 		end,
 	})
 end)
+
+mt2d.dot=function(pos,v)
+	v=v or "008"
+	local a=""
+	for i=1,3,1 do
+		local n=tonumber(v:sub(i,i))
+		if not n or n==0 or n>8 then n=1 end
+		a=a .. string.sub("13579bdf",n,n):rep(2)
+	end
+	minetest.add_entity(pos, "mt2d:dot"):set_properties({textures = {"bubble.png^[colorize:#"..a}})
+end
+
+minetest.register_entity("mt2d:dot",{
+	hp_max = 1,
+	physical = false,
+	collisionbox = {0,0,0,0,0,0},
+	visual = "sprite",
+	visual_size = {x=0.2, y=0.2},
+	textures = {"bubble.png"},
+	makes_footstep_sound = false,
+	on_step = function(self, dtime)
+		self.timer=self.timer+dtime
+		if self.timer<0.1 then return self end
+		self.object:remove()
+	end,
+	timer=0,
+})

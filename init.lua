@@ -386,3 +386,28 @@ end
 mt2d.set_detach=function(name)
 	mt2d.attach[name]=nil
 end
+
+mt2d.path=function(pos,l,dir,group)
+	local c={}
+	local lastpos=pos
+	for i=dir,ldir,dir do
+		c,lastpos=mt2d.path_get(dir,c,lastpos,group)
+		if not lastpos then
+			break
+		end
+	end
+	return c
+end
+
+mt2d.path_get=function(d,c,lp,group)
+	for i, r in pairs({{x=0,y=0},{x=d,y=0},{x=d-1,y=0},{x=0,y=1},{x=0,y=-1}}) do
+		local p={x=lp.x+r.x,y=lp.y+r.y,z=0}
+		local ps=minetest.pos_to_string(p)
+		if not c[ps] and minetest.get_item_group(minetest.get_node(p).name,group)>0 then
+			c[ps]=p
+			table.insert(c,p)
+			return c,p
+		end
+	end
+	return c
+end
