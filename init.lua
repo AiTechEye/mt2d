@@ -22,8 +22,6 @@ minetest.register_privilege("leave2d", {
 })
 
 minetest.after(0.1, function()
-	minetest.unregister_item("carts:cart")
-
 	minetest.registered_entities["__builtin:item"].on_activate2=minetest.registered_entities["__builtin:item"].on_activate
 	minetest.registered_entities["__builtin:item"].on_activate=function(self, staticdata,time)
 		minetest.registered_entities["__builtin:item"].on_activate2(self, staticdata,time)
@@ -384,14 +382,22 @@ mt2d.get_attach=function(name)
 end
 
 mt2d.set_detach=function(name)
-	mt2d.attach[name]=nil
+	if mt2d.attach[name] then
+		mt2d.attach[name]=nil
+	end
+end
+
+mt2d.path_iremove=function(path,index)
+	path[minetest.pos_to_string(path[index])]=nil
+	table.remove(path,index)
+	return path
 end
 
 mt2d.path=function(pos,l,dir,group)
 	local c={}
-	local lastpos=pos
-	for i=dir,ldir,dir do
-		c,lastpos=mt2d.path_get(dir,c,lastpos,group)
+	local lastpos={x=math.floor(pos.x),y=math.floor(pos.y),z=0}
+	for i=dir,l*dir,dir do
+		c,lastpos=mt2d.path_add(dir,c,lastpos,group)
 		if not lastpos then
 			break
 		end
@@ -399,8 +405,8 @@ mt2d.path=function(pos,l,dir,group)
 	return c
 end
 
-mt2d.path_get=function(d,c,lp,group)
-	for i, r in pairs({{x=0,y=0},{x=d,y=0},{x=d-1,y=0},{x=0,y=1},{x=0,y=-1}}) do
+mt2d.path_add=function(d,c,lp,group)
+	for i, r in pairs({{x=0,y=0},{x=d,y=0},{x=0,y=1},{x=0,y=-1},{x=-d,y=0}}) do
 		local p={x=lp.x+r.x,y=lp.y+r.y,z=0}
 		local ps=minetest.pos_to_string(p)
 		if not c[ps] and minetest.get_item_group(minetest.get_node(p).name,group)>0 then

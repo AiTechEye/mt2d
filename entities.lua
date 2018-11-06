@@ -429,3 +429,181 @@ minetest.register_entity("mt2d:dot",{
 	end,
 	timer=0,
 })
+
+minetest.register_entity("mt2d:cart",{
+	hp_max = 10,
+	physical = false,
+	visual =  "upright_sprite",
+	collisionbox = {-0.5,-0.5,0,0.5,0.5,0},
+	textures = {"carts_cart_side.png"},
+	is_visible = true,
+	makes_footstep_sound = false,
+	new_path=function(self)
+		if self.d==0 then return end
+		local newpath=mt2d.path(self.object:get_pos(),10,self.d,"rail")
+		if newpath then
+			self.path=newpath
+			table.remove(self.path,1)
+			return self
+		end
+	end,
+	on_activate=function(self, staticdata)
+		self.d=0
+		self.v=0
+		self.stucktime=0
+	end,
+	on_rightclick=function(self, clicker)
+		local name=clicker:get_player_name()
+		if not self.user and mt2d.user[name] and mt2d.user[name].object then
+			self.user=clicker
+			self.username=name
+			self.id=mt2d.user[name].id
+			self.ob=mt2d.user[name].object
+			mt2d.player_anim(self,"sit")
+			mt2d.set_attach(name,self.object,self.ob,{y=0.8,z=-0.1})
+		elseif self.user and self.username==name then
+			self.user=nil
+			self.username=nil
+			self.id=nil
+			self.ob=nil
+			mt2d.set_detach(name)
+			self.anim=nil
+		end
+	end,
+	on_punch=function(self, puncher, time_from_last_punch, tool_capabilities, dir)
+		tool_capabilities.damage_groups.fleshy=tool_capabilities.damage_groups.fleshy or 1
+		if not self.user then
+			if puncher:get_inventory() then
+				puncher:get_inventory():add_item("main","carts:cart")
+			else
+				minetest.add_item(self.object:get_pos(),"carts:cart")
+			end
+			self.object:remove()
+		elseif self.object:get_hp()-tool_capabilities.damage_groups.fleshy<=0 then
+			self.anim=nil
+			mt2d.set_detach(self.username)
+			mt2d.player_anim(self,"stand")
+		end
+	end,
+	on_step=function(self, dtime)
+
+		local v=self.object:get_velocity()
+		local pos=self.object:get_pos()
+
+		if self.user and mt2d.user[self.username] and self.id==mt2d.user[self.username].id then
+			local key=self.user:get_player_control()
+			if key.left and self.v<self.max_speed then
+				self.v=self.v+0.1
+				if self.v<=0.1 then
+					self.d=1
+					self.new_path(self)
+					self.ob:set_yaw(4.71)
+				end
+			elseif key.right and self.v>-self.max_speed then
+				self.v=self.v-0.1
+				if self.v>=-0.1 then
+					self.d=-1
+					self.new_path(self)
+					self.ob:set_yaw(1.57)
+				end
+			elseif key.sneak then
+				self.on_rightclick(self, self.user)
+			elseif math.abs(self.v)>0.1 then
+				self.v=self.v*0.99
+			end
+		elseif self.v~=0 then
+			self.v=self.v*0.99
+			if math.abs(self.v)<=0.1 then
+				self.d=0
+				self.v=0
+				self.path=nil
+				self.next_pos=nil
+				mt2d.set_detach(self.username)
+				self.user=nil
+				self.username=nil
+				self.id=nil
+				self.ob=nil
+				self.object:set_velocity({x=0,y=0,z=0})
+				return
+			end
+		end
+
+		if not self.path or not self.path[1] then
+			self.object:set_velocity({x=0,y=0,z=0})
+			return
+		end
+
+		pos={x=math.floor(pos.x*2)*0.5,y=math.floor(pos.y*2)*0.5,z=0}
+		local d=math.floor(math.abs(self.v*0.1))
+
+		if math.abs(self.v)>10 then
+			self.stucktime=self.stucktime+dtime
+			if self.stucktime>0.1 and self.path[2+d] then
+				self.next_pos=self.path[2+d]
+				self.stucktime=0
+			elseif self.stucktime>0.1 then
+				self.new_path(self)
+				self.next_pos=self.path[2]
+			end
+		end
+
+		for i=1,9,1 do
+			if self.path[i] and (pos.x==self.path[i].x and pos.y==self.path[i].y) or not self.next_pos then
+				if self.path[i+1+d] then
+					self.old_pos=self.next_pos
+					self.next_pos=self.path[i+1+d]
+					self.stucktime=0
+				end
+				local l=#self.path
+				for ii=i,1,-1 do
+					if #self.path==0 then return end
+					self.path=mt2d.path_add(self.d,self.path,self.path[#self.path],"rail")
+					self.path=mt2d.path_iremove(self.path,1)
+				end
+				break
+			end
+		end
+		if not self.next_pos then
+			return
+		end
+		local rail=minetest.get_node(pos).name
+		local ov=self.v
+
+		if self.v<self.max_speed and ((pos.y>self.next_pos.y) or rail=="carts:powerrail") then
+			self.v=self.v*1.05
+			self.v=math.floor(self.v*100)/100
+		elseif self.v>-self.max_speed and ((pos.y<self.next_pos.y) or rail=="carts:brakerail") then
+			self.v=self.v*0.99
+			self.v=math.floor(self.v*100)/100
+		elseif minetest.get_node(self.next_pos).name=="mt2d:stoprail" then
+			self.v=0.1
+			if self.user then 
+				self.on_rightclick(self, self.user)
+				self.user=nil
+			end
+		end
+		local a=math.abs(self.v)
+		self.object:set_velocity({x=(self.next_pos.x-pos.x)*a,y=(self.next_pos.y-pos.y)*a,z=0})
+	end,
+	d=0,
+	v=0,
+	stucktime=0,
+	max_speed=20,
+	type="npc",
+	team="Sam",
+})
+
+minetest.after(0.1, function()
+	minetest.override_item("carts:cart", {
+		on_place=function(itemstack, user, pointed_thing)
+			if minetest.get_item_group(minetest.get_node(pointed_thing.under).name,"rail")==0 then return end
+			itemstack:take_item()
+			local p=pointed_thing.under
+			minetest.add_entity({x=p.x,y=p.y,z=0.1}, "mt2d:cart")
+			return itemstack
+		end,
+	})
+	minetest.override_item("carts:rail",{groups={dig_immediate=2,rail=1,connect_to_raillike=minetest.raillike_group("rail")}})
+	minetest.override_item("carts:powerrail",{groups={dig_immediate=2,rail=1,connect_to_raillike=minetest.raillike_group("rail")}})
+	minetest.override_item("carts:brakerail",{groups={dig_immediate=2,rail=1,connect_to_raillike=minetest.raillike_group("rail")}})
+end)

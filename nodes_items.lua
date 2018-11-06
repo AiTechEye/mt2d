@@ -310,3 +310,20 @@ minetest.register_node("mt2d:" .. t[1],{
 		end
 	end)
 end
+
+minetest.register_craft({
+	output = "mt2d:stoprail 18",
+	recipe = {
+		{"default:steel_ingot","group:wood","default:steel_ingot"},
+		{"default:steel_ingot","group:stick","default:steel_ingot"},
+		{"default:steel_ingot","group:wood","default:steel_ingot"},
+	}
+})
+
+minetest.register_node("mt2d:stoprail", {
+	description = "Stoprail",
+	walkable=false,
+	inventory_image="carts_rail_straight.png^[colorize:#ff0000aa",
+	groups={dig_immediate=2,rail=1,connect_to_raillike=minetest.raillike_group("rail")},
+	tiles={"carts_rail_crossing_pwr.png^[colorize:#ff0000aa"},
+})
