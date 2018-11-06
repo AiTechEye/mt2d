@@ -2,6 +2,6 @@
 
 # code/media License: CC0
 
-Version: 1.4
+Version: 1.5
 
 transforms the minetest world into 2d dimension
