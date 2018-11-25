@@ -44,7 +44,44 @@ minetest.after(0.1, function()
 	end
 	for i, v in pairs(minetest.registered_nodes) do
 		if v.drawtype~="airlike" and not v.mt2d then
+
+			local inventory_image=v.inventory_image
+			local walkable=v.walkable
+			local tiles=v.tiles
+
+			if string.find(v.name,"fence") and tiles[1] then
+				inventory_image="mt2d_fence.png^" .. tiles[1] .. "^mt2d_fence.png^[makealpha:0,255,0"
+				tiles[1]=inventory_image
+				walkable=false
+			end
+
+			if #tiles==6 then
+				tiles={
+					tiles[1],
+					tiles[2],
+					tiles[3],
+					tiles[4],
+					tiles[6],
+					tiles[5],
+				}
+				if inventory_image=="" then
+					inventory_image=tiles[5]
+				end
+			end
+			if inventory_image=="" then
+				if tiles[1] and type(tiles[1].name)=="string" then
+					inventory_image=tiles[1].name
+				elseif tiles[3] and type(tiles[3].name)=="string" then
+					inventory_image=tiles[3].name
+				else
+					inventory_image=tiles[#tiles]
+				end
+			end
+
 			minetest.override_item(i, {
+				tiles=tiles,
+				walkable=walkable,
+				inventory_image=inventory_image,
 				paramtype="light",
 				paramtype2="none",
 				drawtype="nodebox",
@@ -131,6 +168,32 @@ minetest.register_globalstep(function(dtime)
 		local pos1=a.ob1:get_pos()
 		local pos2=a.ob2:get_pos()
 		a.ob2:set_velocity({x=((pos1.x-pos2.x)+a.pos.x)*10,y=((pos1.y-pos2.y)+a.pos.y)*10,z=((pos1.z-pos2.z)+a.pos.z)*10})
+
+
+		local user
+
+		if a.ob1:get_luaentity() and a.ob1:get_luaentity().user then
+			user=a.ob1:get_luaentity().user
+		elseif a.ob2:get_luaentity() and a.ob2:get_luaentity().user then
+			user=a.ob2:get_luaentity().user
+		elseif a.ob1:is_player() then
+			user=a.ob1
+		elseif a.ob2:is_player() then
+			user=a.ob2
+		end
+
+		if user then
+			local yaw=user:get_look_yaw()
+			local pitch=user:get_look_pitch()
+			local tyaw=math.abs(yaw-4.71)
+			local tpitch=math.abs(pitch)
+			local npointable=not mt2d.pointable(pos2,user)
+			if tyaw>0.5 or (npointable and tyaw>0.2) then
+				user:set_look_yaw(3.14+((yaw-4.71)*0.9))
+			elseif tpitch>0.5 or (npointable and tpitch>0.2) then
+				user:set_look_pitch((pitch*0.9)*-1)
+			end
+		end
 	end
 
 	mt2d.timer=mt2d.timer+dtime
