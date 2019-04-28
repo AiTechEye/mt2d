@@ -20,8 +20,8 @@ minetest.register_privilege("leave2d", {
 	description = "Leave Dimension",
 	give_to_singleplayer= false,
 })
-
-minetest.after(0.1, function()
+minetest.register_on_mods_loaded(function()
+--minetest.after(0.1, function()
 	minetest.registered_entities["__builtin:item"].on_activate2=minetest.registered_entities["__builtin:item"].on_activate
 	minetest.registered_entities["__builtin:item"].on_activate=function(self, staticdata,time)
 		minetest.registered_entities["__builtin:item"].on_activate2(self, staticdata,time)
@@ -69,11 +69,18 @@ minetest.after(0.1, function()
 				end
 			end
 			if inventory_image=="" then
-				if tiles[1] and type(tiles[1].name)=="string" then
+				if tiles[1] and tiles[1].name and tiles[1].animation then
+					tiles = nil
+				elseif tiles[1] and type(tiles[1].name)=="string" then
 					inventory_image=tiles[1].name
+
 				elseif tiles[3] and type(tiles[3].name)=="string" then
 					inventory_image=tiles[3].name
-				else
+
+					if minetest.get_item_group(v.name,"soil") > 0 then
+						tiles={inventory_image}
+					end
+				elseif type(tiles[#tiles])=="string" then
 					inventory_image=tiles[#tiles]
 				end
 			end
@@ -213,7 +220,7 @@ end)
 minetest.register_on_joinplayer(function(player)
 	local pos=player:get_pos()
 	player:set_pos({x=pos.x,y=pos.y,z=0})
-	minetest.after(1, function(player)
+	minetest.after(2, function(player)
 		mt2d.new_player(player)
 	end,player)
 end)
