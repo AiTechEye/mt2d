@@ -38,7 +38,7 @@ minetest.register_on_mods_loaded(function()
 		return self
 	end
 	for i, v in pairs(minetest.registered_items) do
-		if not v.ragne or v.ragne<8 then
+		if not v.range or v.range<8 then
 			minetest.override_item(i, {range=8})
 		end
 	end
