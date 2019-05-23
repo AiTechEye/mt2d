@@ -43,7 +43,7 @@ minetest.register_on_mods_loaded(function()
 		end
 	end
 	for i, v in pairs(minetest.registered_nodes) do
-		if v.drawtype~="airlike" and not v.mt2d then
+		if v.drawtype~="airlike" and not v.mt2d and v.tiles then
 
 			local inventory_image=v.inventory_image
 			local walkable=v.walkable
