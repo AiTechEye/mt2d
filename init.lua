@@ -196,9 +196,9 @@ minetest.register_globalstep(function(dtime)
 			local tpitch=math.abs(pitch)
 			local npointable=not mt2d.pointable(pos2,user)
 			if tyaw>0.5 or (npointable and tyaw>0.2) then
-				user:set_look_yaw(3.14+((yaw-4.71)*0.9))
+				user:set_look_yaw(3.14+((yaw-4.71)*0.99))
 			elseif tpitch>0.5 or (npointable and tpitch>0.2) then
-				user:set_look_pitch((pitch*0.9)*-1)
+				user:set_look_pitch((pitch*0.99)*-1)
 			end
 		end
 	end

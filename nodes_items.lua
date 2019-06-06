@@ -327,3 +327,24 @@ minetest.register_node("mt2d:stoprail", {
 	groups={dig_immediate=2,rail=1,connect_to_raillike=minetest.raillike_group("rail")},
 	tiles={"carts_rail_crossing_pwr.png^[colorize:#ff0000aa"},
 })
+
+mt2d.register_ore=function(def)
+	minetest.register_ore({
+		ore_type="scatter",
+		ore=def.ore,
+		wherein="default:stone",
+		clust_scarcity=def.scarcity and (def.scarcity*def.scarcity*def.scarcity) or (8*8*8),
+		clust_num_ores=15,
+		clust_size=def.size or 3,
+		y_max=def.y_max or 0,
+		y_min=-31000
+	})
+end
+mt2d.register_ore({ore="default:stone_with_coal",scarcity=6,y_max=16})
+mt2d.register_ore({ore="default:stone_with_iron",scarcity=7})
+mt2d.register_ore({ore="default:stone_with_copper",scarcity=8,y_max=-16})
+mt2d.register_ore({ore="default:stone_with_tin",scarcity=8,y_max=-32})
+mt2d.register_ore({ore="default:stone_with_gold",scarcity=8,y_max=-100})
+mt2d.register_ore({ore="default:stone_with_mese",scarcity=9,y_max=-700})
+mt2d.register_ore({ore="default:stone_with_diamond",scarcity=10,y_max=-700})
+mt2d.register_ore({ore="default:mese",scarcity=15,y_max=-1000})
