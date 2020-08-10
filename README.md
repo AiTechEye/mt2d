@@ -2,6 +2,6 @@
 
  Licenses: code: LGPL-2.1, media: CC BY-SA-4.0
 
-Version: 2.6
+Version: 2.7
 
 transforms the minetest world into 2d dimension
