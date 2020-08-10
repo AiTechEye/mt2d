@@ -2,7 +2,8 @@ minetest.register_entity("mt2d:cam",{
 	hp_max = 99999,
 	collisionbox = {0,0,0,0,0,0},
 	visual =  "sprite",
-	textures ={"mt2d_air.png"},
+	textures = {"mt2d_air.png"},
+	jump_timer = 0,
 	on_activate=function(self, staticdata)
 		self.timer=0
 		self.dmgtimer=0
@@ -108,6 +109,7 @@ minetest.register_entity("mt2d:cam",{
 			end
 		end
 --input & anim
+
 		if self.ob:get_luaentity().dead or mt2d.attach[self.username] then
 			self.object:set_velocity({x=((pos2.x-pos.x)*10)+self.user_pos.x,y=(-0.5+(pos2.y-pos.y))*10,z=(5-(pos.z-pos2.z))*10})
 			return self
@@ -120,7 +122,8 @@ minetest.register_entity("mt2d:cam",{
 				self.wakeup=nil
 				self.ob:set_acceleration({x=0,y=-20,z=0})
 			end
-		elseif key.up and (v.y==0 or self.floating) then
+		elseif key.up and (v.y==0 or self.floating) and self.jump_timer <= 0 then
+			self.jump_timer = 0.05
 			v.y=8
 		elseif key.left then
 			v.x=4
@@ -141,7 +144,9 @@ minetest.register_entity("mt2d:cam",{
 			v={x=0,y=v.y,z=0}
 		end
 
-		if self.floating then
+		if self.jump_timer > 0 and v.y == 0 then
+			self.jump_timer = self.jump_timer -dtime
+		elseif self.floating then
 			v.x=v.x/2
 			v.y=v.y/2
 			if key.down then
@@ -226,7 +231,7 @@ minetest.register_entity("mt2d:cam",{
 minetest.register_entity("mt2d:player",{
 	hp_max = 20,
 	physical = true,
-	collisionbox = {-0.35,-1,-0,0.35,0.8,0},
+	collisionbox = {-0.35,-1,-0.01,0.35,0.8,0.01},
 	visual =  "mesh",
 	mesh = "mt2d_character.b3d",
 	textures = {"mt2d_air.png","mt2d_air.png"},
