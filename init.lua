@@ -22,19 +22,30 @@ minetest.register_privilege("leave2d", {
 })
 minetest.register_on_mods_loaded(function()
 --minetest.after(0.1, function()
+	minetest.registered_entities["__builtin:falling_node"].on_activate2=minetest.registered_entities["__builtin:falling_node"].on_activate
+	minetest.registered_entities["__builtin:falling_node"].on_activate=function(self, staticdata,time)
+		minetest.registered_entities["__builtin:falling_node"].on_activate2(self, staticdata,time)
+		minetest.after(0, function()
+			self.object:set_properties({
+				collisionbox={-0.5,-0.5,-0.5,0.5,0.5,0.5}
+			})
+		end)
+	end
+
 	minetest.registered_entities["__builtin:item"].on_activate2=minetest.registered_entities["__builtin:item"].on_activate
 	minetest.registered_entities["__builtin:item"].on_activate=function(self, staticdata,time)
 		minetest.registered_entities["__builtin:item"].on_activate2(self, staticdata,time)
-			minetest.after(0, function(self)
+			minetest.after(0, function()
 				if self and self.object then
 					self.object:set_properties({
 						automatic_rotate=0,
-						collisionbox={-0.2,-0.2,0,0.2,0.2,0},
+						collisionbox={-0.2,-0.2,-0.2,0.2,0.2,0.2},
+						--physical = true
 					})
 					local pos=self.object:get_pos()
 					self.object:set_pos({x=pos.x,y=pos.y,z=0})
 				end
-			end,self)
+			end)
 		return self
 	end
 	for i, v in pairs(minetest.registered_items) do
@@ -82,6 +93,14 @@ minetest.register_on_mods_loaded(function()
 					end
 				elseif type(tiles[#tiles])=="string" then
 					inventory_image=tiles[#tiles]
+				end
+			end
+
+			if type(inventory_image) == "table" then
+				if inventory_image.name then
+					inventory_image = inventory_image.name
+				elseif inventory_image.image then
+					inventory_image = inventory_image.image
 				end
 			end
 
@@ -176,7 +195,6 @@ minetest.register_globalstep(function(dtime)
 		local pos2=a.ob2:get_pos()
 		a.ob2:set_velocity({x=((pos1.x-pos2.x)+a.pos.x)*10,y=((pos1.y-pos2.y)+a.pos.y)*10,z=((pos1.z-pos2.z)+a.pos.z)*10})
 
-
 		local user
 
 		if a.ob1:get_luaentity() and a.ob1:get_luaentity().user then
@@ -190,15 +208,18 @@ minetest.register_globalstep(function(dtime)
 		end
 
 		if user then
-			local yaw=user:get_look_yaw()
-			local pitch=user:get_look_pitch()
-			local tyaw=math.abs(yaw-4.71)
+
+			local yaw=user:get_look_horizontal()
+			local pitch=user:get_look_vertical()
+			local tyaw=math.abs(yaw)
 			local tpitch=math.abs(pitch)
 			local npointable=not mt2d.pointable(pos2,user)
-			if tyaw>0.5 or (npointable and tyaw>0.2) then
-				user:set_look_yaw(3.14+((yaw-4.71)*0.99))
-			elseif tpitch>0.5 or (npointable and tpitch>0.2) then
-				user:set_look_pitch((pitch*0.99)*-1)
+
+			if math.abs(yaw-math.pi) > 0.5 or (npointable and math.abs(yaw-math.pi) > 0.2) then
+				local m = (yaw-math.pi)*0.9
+				user:set_look_horizontal(math.pi+m)
+			elseif tpitch > 0.5 or (npointable and tpitch > 0.2) then
+				user:set_look_vertical(pitch*0.9)
 			end
 		end
 	end
@@ -289,7 +310,8 @@ mt2d.pointable=function(p1,user)
 	local hit
 	for i=1,d,0.5 do
 		local node=minetest.get_node({x=p1.x+(v.x*i),y=p1.y+(v.y*i),z=p1.z+(v.z*i)})
-		if hit and minetest.registered_nodes[node.name] and minetest.registered_nodes[node.name].walkable then
+		local def = minetest.registered_nodes[node.name] or {}
+		if hit and def.walkable then
 			return false
 		end
 		hit=true
@@ -385,7 +407,6 @@ minetest.spawn_item=function(pos, item)
 
 				e:set_pos({x=pos.x+(v.x/2),y=pos.y-0.5,z=0})
 				e:set_velocity({x=v.x,y=0,z=0})
-
 			end
 		end,e)
 

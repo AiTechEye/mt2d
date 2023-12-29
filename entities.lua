@@ -188,18 +188,17 @@ minetest.register_entity("mt2d:cam",{
 			self.object:set_velocity({x=((pos2.x-pos.x))+self.user_pos.x,y=(-0.5+(pos2.y-pos.y)),z=(5-(pos.z-pos2.z))})
 		end
 
-		local yaw=self.user:get_look_yaw()
-		local pitch=self.user:get_look_pitch()
-
-		local tyaw=math.abs(yaw-4.71)
+		local yaw=self.user:get_look_horizontal()
+		local pitch=self.user:get_look_vertical()
+		local tyaw=math.abs(yaw)
 		local tpitch=math.abs(pitch)
 		local npointable=not mt2d.pointable(pos2,self.user)
 
-		if tyaw>0.5 or (npointable and tyaw>0.2) then
-			self.user:set_look_yaw(3.14+((yaw-4.71)*0.9))
-
-		elseif tpitch>0.5 or (npointable and tpitch>0.2) then
-			self.user:set_look_pitch((pitch*0.9)*-1)
+		if math.abs(yaw-math.pi) > 0.5 or (npointable and math.abs(yaw-math.pi) > 0.2) then
+			local m = (yaw-math.pi)*0.9
+			self.user:set_look_horizontal(math.pi+m)
+		elseif tpitch > 0.5 or (npointable and tpitch > 0.2) then
+			self.user:set_look_vertical(pitch*0.9)
 		end
 
 		if self.powersaving.dir~=tyaw+tpitch or self.powersaving.x~=v.x or self.powersaving.y~=v.y then

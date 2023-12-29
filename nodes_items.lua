@@ -4,6 +4,8 @@ minetest.register_node("mt2d:blocking", {
 	pointable=false,
 	mt2d=true,
 	groups={blockingsky=1},
+	sunlight_propagates = true,
+	paramtype = "light",
 	after_destruct = function(pos, oldnode)
 		local m=minetest.get_meta(pos)
 		if m:get_int("reset")==0 then
@@ -69,6 +71,8 @@ minetest.register_node("mt2d:blocking_sky", {
 	groups={blockingsky=1},
 	tiles={"default_cloud.png^[colorize:#9ee7ffff"},
 	drawtype = "liquid",
+	sunlight_propagates = true,
+	paramtype = "light",
 	liquidtype = "source",
 	liquid_range = 0,
 	liquid_alternative_flowing = "mt2d:blocking_sky",
