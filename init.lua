@@ -31,16 +31,15 @@ minetest.register_on_mods_loaded(function()
 			})
 		end)
 	end
-
-	minetest.registered_entities["__builtin:item"].on_activate2=minetest.registered_entities["__builtin:item"].on_activate
-	minetest.registered_entities["__builtin:item"].on_activate=function(self, staticdata,time)
-		minetest.registered_entities["__builtin:item"].on_activate2(self, staticdata,time)
+	local item_def = minetest.registered_entities["__builtin:item"]
+	item_def.on_activate2=item_def.on_activate
+	item_def.on_activate=function(self, staticdata,time)
+		item_def.on_activate2(self, staticdata,time)
 			minetest.after(0, function()
 				if self and self.object then
 					self.object:set_properties({
 						automatic_rotate=0,
 						collisionbox={-0.2,-0.2,-0.2,0.2,0.2,0.2},
-						--physical = true
 					})
 					local pos=self.object:get_pos()
 					self.object:set_pos({x=pos.x,y=pos.y,z=0})
@@ -48,6 +47,16 @@ minetest.register_on_mods_loaded(function()
 			end)
 		return self
 	end
+	item_def.try_merge_with2 = item_def.try_merge_with
+	item_def.try_merge_with=function(self, own_stack, object, entity)
+		item_def.try_merge_with2(self,own_stack, object, entity)
+		self.object:set_properties({
+			automatic_rotate=0
+		})
+	end
+
+
+
 	for i, v in pairs(minetest.registered_items) do
 		if not v.range or v.range<8 then
 			minetest.override_item(i, {range=8})
@@ -362,7 +371,6 @@ minetest.register_on_generated(function(minp, maxp, seed)
 			data[area:index(x,y,z)]=blocking
 		elseif z~=0 then
 			data[area:index(x,y,z)]=air
-
 		end
 	end
 	end
