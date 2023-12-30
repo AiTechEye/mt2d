@@ -338,11 +338,10 @@ minetest.register_node("mt2d:bedblocking", {
 	pointable=false,
 	walkable=false,
 	mt2d=true,
-	groups={unbreakable=1},
+	groups={unbreakable=1,not_in_creative_inventory=1},
 	sunlight_propagates = true,
 	paramtype = "light",
 })
-
 
 minetest.register_craft({
 	output = "mt2d:stoprail 18",
