@@ -252,7 +252,8 @@ mt2d.registry_door(
 for i, t in pairs({{"bed","Bed"},{"fancy_bed","Fancy bed"}}) do
 minetest.register_node("mt2d:" .. t[1],{
 	description = t[1],
-	groups = {choppy = 2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1},
+	drop="beds:"..t[1],
+	groups = {choppy = 2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1,bed=1},
 	drawtype="nodebox",
 	paramtype="light",
 	tiles = {"mt2d_" .. t[1] ..".png"},
@@ -304,16 +305,44 @@ minetest.register_node("mt2d:" .. t[1],{
 				u.cam:get_luaentity().wakeup=true
 			end
 		end
-	end
+	end,
+	after_destruct = function(pos, oldnode)
+		local pos2 = vector.new(pos.x+1,pos.y,0)
+		if minetest.get_node(pos2).name == "mt2d:bedblocking" then
+			minetest.remove_node(pos2)
+		end
+	end,
 })
 	minetest.after(0.1, function()
 		minetest.registered_nodes["beds:" .. t[1]].on_place=function(itemstack, user, pointed_thing)
+			if not pointed_thing.above then
+				return
+			end
 			local pos=pointed_thing.above
-			if not pos or minetest.get_node({x=pos.x-1,y=pos.y,z=0}).name~="air" then return false end
+			local pos2 = vector.new(pos.x+1,pos.y,0)
+			local na = minetest.get_node(pos2).name
+			if na ~="air" and na ~= "mt2d:bedblocking" then
+				return
+			end
 			minetest.set_node(pos,{name="mt2d:" .. t[1]})
+			minetest.set_node(pos2,{name="mt2d:bedblocking"})
+			itemstack:take_item()
+			return itemstack
 		end
 	end)
 end
+
+minetest.register_node("mt2d:bedblocking", {
+	description = "bed blocking",
+	drawtype="airlike",
+	pointable=false,
+	walkable=false,
+	mt2d=true,
+	groups={unbreakable=1},
+	sunlight_propagates = true,
+	paramtype = "light",
+})
+
 
 minetest.register_craft({
 	output = "mt2d:stoprail 18",
