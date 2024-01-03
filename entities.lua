@@ -235,6 +235,7 @@ minetest.register_entity("mt2d:player",{
 	mesh = "mt2d_character.b3d",
 	textures = {"mt2d_air.png","mt2d_air.png"},
 	is_visible = true,
+	stepheight = 0.7,
 	makes_footstep_sound = true,
 	on_activate=function(self, staticdata)
 		local rndlook={4.71,1.57}

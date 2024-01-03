@@ -121,17 +121,51 @@ minetest.register_on_mods_loaded(function()
 					inventory_image = inventory_image.image
 				end
 			end
+			
+			local node_box = {{-0.5, -0.5, 0, 0.5, 0.5, 0}}
+			local collision_box = {{-0.5, -0.5, -0.5, 0.5, 0.5, 0.5}}
+			local selection_box = {{-0.5, -0.5, -0.5, 0.5, 0.5, 0}}
+			local after_place_node
+			local param2
+
+			if v.groups.slab then
+				node_box = {
+					{-0.5, -0.5, 0, 0.5, 0, 0},
+				}
+				collision_box = {
+					{-0.5, -0.5, -0.5, 0.5, 0, 0.5},
+				}
+				selection_box = node_box
+				inventory_image = nil
+			elseif v.groups.stair then
+				node_box = {
+					{0, 0, 0, 0.5, 0.5, 0},
+					{-0.5, -0.5, 0, 0.5, 0, 0},
+				}
+				collision_box = {
+					{0, 0, -0.5, 0.5, 0.5, 0.5},
+					{-0.5, -0.5, -0.5, 0.5, 0, 0.5},
+				}
+				selection_box = node_box
+				param2 = "4dir"
+				inventory_image = nil
+				after_place_node = function(pos,placer,itemstack, pointed_thing)
+					minetest.swap_node(pos,{name=i,param2=placer:get_pos().x > pos.x and 22 or 0})
+				end
+			end
 
 			minetest.override_item(i, {
+				after_place_node = after_place_node,
 				tiles=tiles,
 				walkable=walkable,
 				inventory_image=inventory_image,
 				paramtype="light",
-				paramtype2="none",
+				paramtype2=param2 or "none",
 				drawtype="nodebox",
+				use_texture_alpha = v.use_texture_alpha,
 				node_box = {
 					type = "fixed",
-					fixed = {{-0.5, -0.5, 0, 0.5, 0.5, 0}},
+					fixed = node_box,
 				},
 				selection_box = {
 					type = "fixed",
@@ -139,7 +173,7 @@ minetest.register_on_mods_loaded(function()
 				},
 				collision_box = {
 					type = "fixed",
-					fixed = {{-0.5, -0.5, -0.5, 0.5, 0.5, 0.5}},
+					fixed = collision_box,
 				},
 			})
 		end
