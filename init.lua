@@ -150,7 +150,7 @@ minetest.register_on_mods_loaded(function()
 				param2 = "4dir"
 				inventory_image = nil
 				after_place_node = function(pos,placer,itemstack, pointed_thing)
-					minetest.swap_node(pos,{name=i,param2=placer:get_pos().x > pos.x and 22 or 0})
+					minetest.swap_node(pos,{name=i,param2=placer and placer:get_pos().x > pos.x and 22 or 0})
 				end
 			end
 
