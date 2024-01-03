@@ -2,7 +2,7 @@ mt2d={
 	timer=0,
 	user3d={},	--3d users
 	user={},		--users data
-	attach={},	--attached objects (pushing them)
+	attach={},		--attached objects (pushing them)
 	playeranim={
 		stand={x=1,y=39,speed=30},
 		walk={x=41,y=61,speed=30},
@@ -20,8 +20,19 @@ minetest.register_privilege("leave2d", {
 	description = "Leave Dimension",
 	give_to_singleplayer= false,
 })
+
+minetest.register_lbm({
+	name="mt2d:clearoutside",
+	nodenames={"group:tree","group:leaves"},
+	run_at_every_load = true,
+	action=function(pos,node)
+		if pos.z ~= 0 then
+			minetest.remove_node(pos)
+		end
+	end
+})
+
 minetest.register_on_mods_loaded(function()
---minetest.after(0.1, function()
 	minetest.registered_entities["__builtin:falling_node"].on_activate2=minetest.registered_entities["__builtin:falling_node"].on_activate
 	minetest.registered_entities["__builtin:falling_node"].on_activate=function(self, staticdata,time)
 		minetest.registered_entities["__builtin:falling_node"].on_activate2(self, staticdata,time)
@@ -54,8 +65,6 @@ minetest.register_on_mods_loaded(function()
 			automatic_rotate=0
 		})
 	end
-
-
 
 	for i, v in pairs(minetest.registered_items) do
 		if not v.range or v.range<8 then
@@ -151,6 +160,19 @@ minetest.register_on_mods_loaded(function()
 			return true
 		end
 	end
+	end
+end)
+minetest.register_on_priv_grant(function(name, granter, priv)
+	local m = mt2d.user[name]
+	if (priv == "fly" or priv == "noclip") and m and m.cam then
+		m.cam:get_luaentity()[priv] = true
+	end
+end)
+
+minetest.register_on_priv_revoke(function(name, revoker, priv)
+	local m = mt2d.user[name]
+	if (priv == "fly" or priv == "noclip") and m and m.cam then
+		m.cam:get_luaentity()[priv] = false
 	end
 end)
 
