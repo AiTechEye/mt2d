@@ -246,7 +246,14 @@ minetest.register_entity("mt2d:player",{
 	on_punch=function(self, puncher, time_from_last_punch, tool_capabilities, dir)
 		if not self.user then
 			self.object:remove()
-		elseif not (puncher:is_player() and puncher:get_player_name(puncher)==self.username) and tool_capabilities and tool_capabilities.damage_groups and tool_capabilities.damage_groups.fleshy then
+		elseif puncher == self.user then
+			for _, ob in ipairs(minetest.get_objects_inside_radius(self.object:get_pos(), 2)) do
+				local en=ob:get_luaentity()
+				if en and en.name == "__builtin:item" then
+					ob:punch(self.user,1,{full_punch_interval=1,damage_groups={fleshy=1}})
+				end
+			end
+		elseif puncher ~= self.user and tool_capabilities and tool_capabilities.damage_groups and tool_capabilities.damage_groups.fleshy then
 			self.user:set_hp(self.user:get_hp()-tool_capabilities.damage_groups.fleshy)
 		end
 		return self
