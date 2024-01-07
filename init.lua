@@ -162,7 +162,7 @@ minetest.register_on_mods_loaded(function()
 				paramtype="light",
 				paramtype2=param2 or "none",
 				drawtype="nodebox",
-				use_texture_alpha = v.use_texture_alpha,
+				use_texture_alpha = v.use_texture_alpha or "clip",
 				node_box = {
 					type = "fixed",
 					fixed = node_box,

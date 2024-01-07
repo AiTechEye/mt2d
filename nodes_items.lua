@@ -104,6 +104,7 @@ minetest.register_node("mt2d:door_" .. name .. "_a",{
 	paramtype="light",
 	paramtype2 = "facedir",
 	tiles = {texture},
+	use_texture_alpha = "clip",
 	drop=replace,
 	sounds=sounds,
 	mt2d=true,
@@ -156,6 +157,7 @@ minetest.register_node("mt2d:door_" .. name .. "_b",{
 	paramtype="light",
 	paramtype2 = "facedir",
 	tiles = {texture},
+	use_texture_alpha = "clip",
 	sounds=sounds,
 	mt2d=true,
 	walkable=false,
@@ -197,8 +199,6 @@ minetest.register_node("mt2d:door_" .. name .. "_b",{
 			return itemstack
 		end
 	end,name,replace)
-
-
 end
 
 mt2d.registry_door(
@@ -256,6 +256,7 @@ minetest.register_node("mt2d:" .. t[1],{
 	groups = {choppy = 2, oddly_breakable_by_hand = 2,not_in_creative_inventory=1,bed=1},
 	drawtype="nodebox",
 	paramtype="light",
+	use_texture_alpha = "clip",
 	tiles = {"mt2d_" .. t[1] ..".png"},
 	sounds=default.node_sound_wood_defaults(),
 	mt2d=true,
