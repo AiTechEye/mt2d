@@ -237,6 +237,7 @@ minetest.register_entity("mt2d:player",{
 	is_visible = true,
 	stepheight = 0.7,
 	makes_footstep_sound = true,
+	player = true,
 	on_activate=function(self, staticdata)
 		local rndlook={4.71,1.57}
 		self.object:set_yaw(rndlook[math.random(1,2)])
@@ -258,8 +259,9 @@ minetest.register_entity("mt2d:player",{
 		end
 		return self
 	end,
-	on_step=function(self, dtime)
+	on_step=function(self, dtime, moveresult)
 		self.timer=self.timer+dtime
+
 		if self.start>0 then
 			self.start=self.start-dtime
 			return self
@@ -275,6 +277,18 @@ minetest.register_entity("mt2d:player",{
 			if not self.user:get_attach() then
 				mt2d.new_player(self.user)
 				return
+			end
+		elseif moveresult and moveresult.collides then
+			for i,v in ipairs(moveresult.collisions) do
+				if v.type == "object" then
+					local pos = self.object:get_pos()
+					if v.old_velocity.x < 0 then
+						self.object:set_pos(vector.offset(pos,-0.2,0,0))
+					elseif v.old_velocity.x > 0 then
+						self.object:set_pos(vector.offset(pos,0.2,0,0))
+					end
+				end
+
 			end
 		end
 	end,
